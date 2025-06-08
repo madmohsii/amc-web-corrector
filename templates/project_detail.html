@@ -48,6 +48,9 @@
         <a href="{{ url_for('configure_project', project_id=project_id) }}" class="btn btn-secondary">
             📝 Configurer le QCM
         </a>
+	 <a href="{{ url_for('download_qcm', project_id=project_id) }}" class="btn btn-secondary">
+        📄 Télécharger le QCM
+    	</a>  
         <button onclick="processProject()" class="btn" {% if not uploaded_files %}disabled{% endif %}>
             🚀 Lancer le traitement
         </button>

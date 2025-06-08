@@ -57,6 +57,23 @@ def run_amc_command(command, project_path):
 def index():
     return redirect(url_for('dashboard'))
 
+@app.route('/download_qcm/<project_id>')
+def download_qcm(project_id):
+    """Version debug pour diagnostiquer"""
+    try:
+        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+        latex_file = os.path.join(project_path, 'questionnaire.tex')
+        
+        # Version ultra-simple : juste télécharger le fichier
+        if os.path.exists(latex_file):
+            return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
+        else:
+            flash('Fichier QCM non trouvé', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))
+            
+    except Exception as e:
+        flash(f'Erreur téléchargement: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
 @app.route('/create_project', methods=['GET', 'POST'])
 def create_project():
     if request.method == 'POST':
@@ -293,6 +310,9 @@ def configure_project(project_id):
                          existing_config=existing_config,
                          sample_questions=SAMPLE_QUESTIONS,
                          scoring_strategies=SCORING_STRATEGIES)
+
+
+
 
 @app.route('/api/project/<project_id>/files')
 def api_project_files(project_id):
