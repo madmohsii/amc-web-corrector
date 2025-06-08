@@ -1,0 +1,459 @@
+% extends "base.html" %}
+
+{% block title %}Dashboard - AMC Web Corrector{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>📊 Dashboard</h1>
+    <p>Vue d'ensemble de vos projets et statistiques</p>
+</div>
+
+<!-- Statistiques générales -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+    <div class="stat-card">
+        <div class="stat-icon">📁</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_projects }}</h3>
+            <p>Projets totaux</p>
+            <small>+{{ stats.projects_this_month }} ce mois</small>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_students }}</h3>
+            <p>Copies traitées</p>
+            <small>{{ stats.total_papers_processed }} au total</small>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">📈</div>
+        <div class="stat-content">
+            <h3>{{ "%.1f"|format(stats.average_success_rate) }}%</h3>
+            <p>Taux de réussite moyen</p>
+            <small>Tous projets confondus</small>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-content">
+            <h3 id="activeProjects">--</h3>
+            <p>Projets actifs</p>
+            <small id="lastActivity">--</small>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+    <!-- Graphiques -->
+    <div class="card">
+        <h2>📊 Analyses récentes</h2>
+        <div id="chartsContainer">
+            <div style="margin-bottom: 2rem;">
+                <h4>Distribution des scores (dernier projet)</h4>
+                <canvas id="scoresChart" width="400" height="200"></canvas>
+            </div>
+            
+            <div>
+                <h4>Performance par question (dernier projet)</h4>
+                <canvas id="questionsChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+        
+        <div id="noChartsMessage" style="text-align: center; padding: 2rem; color: #666; display: none;">
+            <p>📈 Aucune donnée à afficher</p>
+            <p>Traitez un projet pour voir les graphiques</p>
+        </div>
+    </div>
+    
+    <!-- Projets récents -->
+    <div class="card">
+        <h2>🕒 Projets récents</h2>
+        {% if recent_projects %}
+            <div class="recent-projects">
+                {% for project in recent_projects %}
+                <div class="recent-project-item">
+                    <div class="project-info">
+                        <h4>{{ project.name }}</h4>
+                        <p>{{ project.created[:10] }}</p>
+                        {% if project.has_results %}
+                            <span class="status-badge success">✅ Traité</span>
+                        {% else %}
+                            <span class="status-badge pending">⏳ En attente</span>
+                        {% endif %}
+                    </div>
+                    <div class="project-actions">
+                        <a href="{{ url_for('project_detail', project_id=project.folder) }}" class="btn-small">Ouvrir</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 2rem; color: #666;">
+                <p>Aucun projet encore</p>
+                <a href="{{ url_for('create_project') }}" class="btn">Créer le premier</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Actions rapides -->
+<div class="card">
+    <h2>⚡ Actions rapides</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <a href="{{ url_for('create_project') }}" class="action-card">
+            <div class="action-icon">🏗️</div>
+            <h4>Nouveau Projet</h4>
+            <p>Créer un projet de correction</p>
+        </a>
+        
+        <a href="{{ url_for('list_projects') }}" class="action-card">
+            <div class="action-icon">📋</div>
+            <h4>Mes Projets</h4>
+            <p>Gérer les projets existants</p>
+        </a>
+        
+        <div class="action-card" onclick="showQuickStats()">
+            <div class="action-icon">📊</div>
+            <h4>Statistiques</h4>
+            <p>Voir les analyses détaillées</p>
+        </div>
+        
+        <div class="action-card" onclick="exportGlobalData()">
+            <div class="action-icon">📤</div>
+            <h4>Export Global</h4>
+            <p>Exporter toutes les données</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.3);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+}
+
+.stat-content h3 {
+    font-size: 2rem;
+    margin: 0;
+    font-weight: bold;
+}
+
+.stat-content p {
+    margin: 0.25rem 0;
+    opacity: 0.9;
+}
+
+.stat-content small {
+    opacity: 0.7;
+    font-size: 0.8rem;
+}
+
+.recent-projects {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.recent-project-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.project-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.project-info p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-top: 0.5rem;
+}
+
+.status-badge.success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.btn-small {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+}
+
+.btn-small:hover {
+    background: #5a6fd8;
+}
+
+.action-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    padding: 1.5rem;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.action-card:hover {
+    border-color: #667eea;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.action-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.action-card h4 {
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+.action-card p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Variables globales pour les graphiques
+let scoresChart = null;
+let questionsChart = null;
+
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+    initializeCharts();
+});
+
+async function loadDashboardData() {
+    try {
+        // Charger les statistiques générales
+        const response = await fetch('/api/stats/overview');
+        const stats = await response.json();
+        
+        // Mettre à jour les statistiques en temps réel
+        updateLiveStats(stats);
+        
+    } catch (error) {
+        console.error('Erreur chargement dashboard:', error);
+    }
+}
+
+function updateLiveStats(stats) {
+    // Projets actifs (projets avec uploads récents)
+    document.getElementById('activeProjects').textContent = stats.projects_this_month || 0;
+    
+    // Dernière activité
+    if (stats.recent_activity && stats.recent_activity.length > 0) {
+        const lastActivity = new Date(stats.recent_activity[0].created);
+        const timeAgo = getTimeAgo(lastActivity);
+        document.getElementById('lastActivity').textContent = timeAgo;
+    } else {
+        document.getElementById('lastActivity').textContent = 'Aucune activité';
+    }
+}
+
+async function initializeCharts() {
+    // Trouver le projet le plus récent avec des résultats
+    const recentProject = await findRecentProjectWithResults();
+    
+    if (recentProject) {
+        await loadProjectCharts(recentProject);
+    } else {
+        document.getElementById('noChartsMessage').style.display = 'block';
+        document.getElementById('chartsContainer').style.display = 'none';
+    }
+}
+
+async function findRecentProjectWithResults() {
+    // Cette fonction devrait retourner l'ID du projet le plus récent avec des résultats
+    // Pour l'instant, on va utiliser une approche simple
+    const projects = {{ recent_projects | tojson }};
+    
+    for (let project of projects) {
+        if (project.has_results) {
+            return project.folder;
+        }
+    }
+    
+    return null;
+}
+
+async function loadProjectCharts(projectId) {
+    try {
+        // Charger les données des graphiques
+        const [scoresResponse, questionsResponse] = await Promise.all([
+            fetch(`/api/chart/scores/${projectId}`),
+            fetch(`/api/chart/questions/${projectId}`)
+        ]);
+        
+        const scoresData = await scoresResponse.json();
+        const questionsData = await questionsResponse.json();
+        
+        // Créer les graphiques
+        createScoresChart(scoresData);
+        createQuestionsChart(questionsData);
+        
+    } catch (error) {
+        console.error('Erreur chargement graphiques:', error);
+        document.getElementById('noChartsMessage').style.display = 'block';
+        document.getElementById('chartsContainer').style.display = 'none';
+    }
+}
+
+function createScoresChart(data) {
+    const ctx = document.getElementById('scoresChart').getContext('2d');
+    
+    if (scoresChart) {
+        scoresChart.destroy();
+    }
+    
+    scoresChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Nombre d\'étudiants',
+                data: data.data,
+                backgroundColor: data.backgroundColor || 'rgba(102, 126, 234, 0.7)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function createQuestionsChart(data) {
+    const ctx = document.getElementById('questionsChart').getContext('2d');
+    
+    if (questionsChart) {
+        questionsChart.destroy();
+    }
+    
+    questionsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Taux de réussite (%)',
+                data: data.data,
+                backgroundColor: data.backgroundColor || 'rgba(40, 167, 69, 0.7)',
+                borderColor: 'rgba(40, 167, 69, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+function getTimeAgo(date) {
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'Hier';
+    if (diffDays < 7) return `Il y a ${diffDays} jours`;
+    if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaines`;
+    return `Il y a ${Math.floor(diffDays / 30)} mois`;
+}
+
+function showQuickStats() {
+    // Afficher une modal avec statistiques détaillées
+    alert('Fonctionnalité statistiques détaillées à implémenter');
+}
+
+function exportGlobalData() {
+    // Export de toutes les données
+    alert('Fonctionnalité export global à implémenter');
+}
+</script>
+{% endblock %}

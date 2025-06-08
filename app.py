@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from dashboard import register_dashboard_routes
 import os
 import subprocess
 import json
@@ -8,6 +9,7 @@ from werkzeug.utils import secure_filename
 import shutil
 from amc_manager import AMCManager
 from sample_questions import SAMPLE_QUESTIONS, SCORING_STRATEGIES
+from dashboard import register_dashboard_routes
 
 app = Flask(__name__)
 app.secret_key = 'votre-cle-secrete-ici'  # Changez ceci en production
@@ -21,6 +23,9 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 # Créer les dossiers nécessaires
 for folder in [UPLOAD_FOLDER, AMC_PROJECTS_FOLDER, RESULTS_FOLDER]:
     os.makedirs(folder, exist_ok=True)
+
+# Enregistrer les routes du dashboard
+register_dashboard_routes(app, AMC_PROJECTS_FOLDER)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -50,7 +55,7 @@ def run_amc_command(command, project_path):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return redirect(url_for('dashboard'))
 
 @app.route('/create_project', methods=['GET', 'POST'])
 def create_project():
@@ -288,6 +293,51 @@ def configure_project(project_id):
                          existing_config=existing_config,
                          sample_questions=SAMPLE_QUESTIONS,
                          scoring_strategies=SCORING_STRATEGIES)
+
+@app.route('/api/project/<project_id>/files')
+def api_project_files(project_id):
+    """API pour récupérer la liste des fichiers d'un projet"""
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    uploads_path = os.path.join(project_path, 'uploads')
+    
+    files = []
+    if os.path.exists(uploads_path):
+        files = os.listdir(uploads_path)
+    
+    return jsonify(files)
+
+@app.route('/api/export/<project_id>/<format_type>')
+def api_export_results(project_id, format_type):
+    """API pour exporter les résultats"""
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    
+    if format_type == 'csv':
+        csv_file = os.path.join(project_path, 'exports', 'notes.csv')
+        if os.path.exists(csv_file):
+            return send_file(csv_file, as_attachment=True, download_name=f'notes_{project_id}.csv')
+        else:
+            return jsonify({'success': False, 'error': 'Fichier CSV non trouvé'}), 404
+    
+    return jsonify({'success': False, 'error': 'Format non supporté'}), 400
+
+@app.route('/delete/<project_id>/<filename>', methods=['DELETE'])
+def delete_file(project_id, filename):
+    """Supprimer un fichier uploadé"""
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    file_path = os.path.join(project_path, 'uploads', secure_filename(filename))
+    
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Fichier non trouvé'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/help')
+def help_page():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

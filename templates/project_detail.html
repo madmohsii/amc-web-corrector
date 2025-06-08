@@ -1,6 +1,4 @@
-<!-- ============================================ -->
-<!-- templates/project_detail.html -->
-{% extends "base.html" %}
+% extends "base.html" %}
 
 {% block title %}{{ project.name }} - AMC Web Corrector{% endblock %}
 
@@ -18,53 +16,22 @@
 <!-- Zone d'upload -->
 <div class="card">
     <h2>📤 Upload des copies</h2>
-    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-        <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
-        <h3>Glissez vos fichiers ici ou cliquez pour sélectionner</h3>
-        <p>Formats acceptés: PDF, PNG, JPG, JPEG</p>
-        <input type="file" id="fileInput" style="display: none;" multiple 
-               accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileSelect(this.files)">
-    </div>
-    
-    <!-- Progress bar -->
-    <div id="uploadProgress" style="display: none; margin-top: 1rem;">
-        <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
-            <div id="progressBar" style="height: 20px; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.3s;"></div>
-        </div>
-        <p id="progressText" style="text-align: center; margin-top: 0.5rem;">Upload en cours...</p>
+    <div id="enhancedUploader">
+        <!-- L'interface sera créée par JavaScript -->
     </div>
 </div>
 
 <!-- Fichiers uploadés -->
-<div class="card">
-    <h2>📋 Fichiers uploadés</h2>
-    {% if uploaded_files %}
-        <div style="display: grid; gap: 1rem; margin-top: 1rem;">
-            {% for file in uploaded_files %}
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
-                <div>
-                    <strong>{{ file }}</strong>
-                    <div style="color: #666; font-size: 0.9rem;">
-                        Uploadé récemment
-                    </div>
-                </div>
-                <button onclick="removeFile('{{ file }}')" class="btn btn-danger" style="padding: 8px 16px;">
-                    Supprimer
-                </button>
-            </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p style="color: #666; text-align: center; padding: 2rem;">
-            Aucun fichier uploadé pour le moment
-        </p>
-    {% endif %}
-</div>
+<!-- Cette section est maintenant gérée par enhanced-upload.js -->
 
 <!-- Actions de traitement -->
 <div class="card">
-    <h2>⚙️ Traitement AMC</h2>
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <h2>⚙️ Configuration et Traitement</h2>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <a href="{{ url_for('configure_project', project_id=project_id) }}" class="btn btn-secondary">
+            📝 Configurer le QCM
+        </a>
         <button onclick="processProject()" class="btn" {% if not uploaded_files %}disabled{% endif %}>
             🚀 Lancer le traitement
         </button>
@@ -81,6 +48,14 @@
         ⚠️ Vous devez d'abord uploader des copies avant de lancer le traitement
     </div>
     {% endif %}
+    
+    <!-- Informations sur le QCM configuré -->
+    <div id="qcmInfo" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-top: 1rem; display: none;">
+        <h4>📋 Configuration actuelle :</h4>
+        <div id="qcmInfoContent">
+            <!-- Les infos seront ajoutées par JavaScript -->
+        </div>
+    </div>
 </div>
 
 <!-- Zone de résultats -->
@@ -152,6 +127,7 @@ function uploadFile(file) {
 
 function removeFile(filename) {
     if (confirm(`Supprimer le fichier ${filename} ?`)) {
+        // Ici vous pourriez ajouter une route de suppression de fichier
         alert('Fonctionnalité de suppression à implémenter');
     }
 }
@@ -208,6 +184,7 @@ function viewResults() {
 }
 
 function exportResults() {
+    // Ici vous pourriez ajouter l'export des résultats
     alert('Fonctionnalité d\'export à implémenter');
 }
 </script>
