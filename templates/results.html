@@ -1,0 +1,73 @@
+<!-- ============================================ -->
+<!-- templates/results.html -->
+{% extends "base.html" %}
+
+{% block title %}Résultats - AMC Web Corrector{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>📊 Résultats de correction</h1>
+            <p>Projet: {{ project_id }}</p>
+        </div>
+        <button onclick="window.close()" class="btn btn-secondary">Fermer</button>
+    </div>
+</div>
+
+{% if results %}
+<div class="card">
+    <h2>📁 Fichiers de résultats générés</h2>
+    <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+        {% for file in results %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
+            <div>
+                <strong>{{ file }}</strong>
+                <div style="color: #666; font-size: 0.9rem;">
+                    {% if file.endswith('.csv') %}
+                        📊 Fichier de notes CSV
+                    {% elif file.endswith('.pdf') %}
+                        📄 Rapport PDF
+                    {% else %}
+                        📁 Fichier de résultats
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button onclick="downloadFile('{{ file }}')" class="btn">
+                    📥 Télécharger
+                </button>
+                {% if file.endswith('.csv') %}
+                <button onclick="previewCSV('{{ file }}')" class="btn btn-secondary">
+                    👁️ Aperçu
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div style="text-align: center; padding: 2rem;">
+        <h2>Aucun résultat disponible</h2>
+        <p>Le traitement n'a pas encore été effectué ou n'a pas généré de résultats.</p>
+        <button onclick="window.close()" class="btn">
+            Retourner au projet
+        </button>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function downloadFile(filename) {
+    alert(`Téléchargement de ${filename} (à implémenter)`);
+}
+
+function previewCSV(filename) {
+    alert('Aperçu CSV à implémenter');
+}
+</script>
+{% endblock %}

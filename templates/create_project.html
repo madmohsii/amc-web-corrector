@@ -1,0 +1,53 @@
+<!-- templates/create_project.html -->
+{% extends "base.html" %}
+
+{% block title %}Nouveau Projet - AMC Web Corrector{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Créer un nouveau projet</h1>
+    <p>Commencez par définir votre projet de correction de QCM</p>
+    
+    <form method="POST" style="margin-top: 2rem;">
+        <div class="form-group">
+            <label for="project_name">Nom du projet *</label>
+            <input type="text" id="project_name" name="project_name" required 
+                   placeholder="Ex: Examen Mathématiques Janvier 2025">
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Description (optionnel)</label>
+            <textarea id="description" name="description" rows="3" 
+                      placeholder="Description détaillée du projet..."></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="submit" class="btn">Créer le Projet</button>
+            <a href="{{ url_for('list_projects') }}" class="btn btn-secondary">Annuler</a>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>ℹ️ Informations importantes</h2>
+    <div style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-top: 1rem;">
+        <h4>Avant de commencer :</h4>
+        <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+            <li>Assurez-vous d'avoir préparé votre QCM au format LaTeX AMC</li>
+            <li>Scannez vos copies au format PDF (haute résolution recommandée)</li>
+            <li>Vérifiez que les codes à barres sont bien visibles</li>
+            <li>Une liste des étudiants au format CSV peut être utile</li>
+        </ul>
+    </div>
+    
+    <div style="background: #e8f5e8; padding: 1rem; border-radius: 5px; margin-top: 1rem;">
+        <h4>Après création du projet :</h4>
+        <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+            <li>Vous pourrez uploader vos copies scannées</li>
+            <li>Configurer les paramètres de correction</li>
+            <li>Lancer le traitement automatique</li>
+            <li>Consulter et exporter les résultats</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

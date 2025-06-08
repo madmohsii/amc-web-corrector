@@ -6,6 +6,8 @@ import uuid
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import shutil
+from amc_manager import AMCManager
+from sample_questions import SAMPLE_QUESTIONS, SCORING_STRATEGIES
 
 app = Flask(__name__)
 app.secret_key = 'votre-cle-secrete-ici'  # Changez ceci en production
@@ -164,22 +166,41 @@ def process_project(project_id):
     if not os.path.exists(uploads_path) or not os.listdir(uploads_path):
         return jsonify({'success': False, 'error': 'Aucun fichier à traiter'})
     
-    # Exemple de traitement AMC basique
-    commands = [
-        # Ici vous devrez adapter selon votre fichier source LaTeX
-        f"auto-multiple-choice prepare --mode s --prefix {project_id} --data {os.path.join(project_path, 'data')}",
-        f"auto-multiple-choice analyse --projet {os.path.join(project_path, 'data')} --cr {os.path.join(project_path, 'cr')} --auto-capture",
-        f"auto-multiple-choice note --data {os.path.join(project_path, 'data')} --bareme default"
-    ]
-    
-    results = []
-    for cmd in commands:
-        result = run_amc_command(cmd, project_path)
-        results.append(result)
-        if not result['success']:
-            break
-    
-    return jsonify({'success': True, 'results': results})
+    try:
+        # Utiliser notre nouveau gestionnaire AMC
+        amc = AMCManager(project_path)
+        
+        # Vérifier s'il y a un fichier LaTeX, sinon créer un exemple
+        latex_file = os.path.join(project_path, 'questionnaire.tex')
+        if not os.path.exists(latex_file):
+            # Créer un QCM de test
+            amc.create_latex_template(SAMPLE_QUESTIONS)
+        
+        # Processus complet
+        results = amc.full_process(scoring_strategy='default')
+        
+        # Formater les résultats pour l'affichage
+        formatted_results = []
+        for step, result in results:
+            formatted_results.append({
+                'step': step,
+                'success': result.get('success', False),
+                'stdout': result.get('stdout', ''),
+                'stderr': result.get('stderr', ''),
+                'error': result.get('error', '')
+            })
+        
+        return jsonify({
+            'success': True, 
+            'results': formatted_results,
+            'statistics': amc.get_statistics()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False, 
+            'error': f'Erreur lors du traitement: {str(e)}'
+        })
 
 @app.route('/results/<project_id>')
 def view_results(project_id):
@@ -198,6 +219,75 @@ def view_results(project_id):
     return render_template('results.html', 
                          project_id=project_id, 
                          results=results)
+
+@app.route('/configure/<project_id>', methods=['GET', 'POST'])
+def configure_project(project_id):
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    info_file = os.path.join(project_path, 'project_info.json')
+    
+    if not os.path.exists(info_file):
+        flash('Projet non trouvé', 'error')
+        return redirect(url_for('list_projects'))
+    
+    with open(info_file, 'r') as f:
+        project_info = json.load(f)
+    
+    if request.method == 'POST':
+        # Traiter la configuration du QCM
+        questions_data = []
+        
+        # Récupérer les questions du formulaire
+        question_count = int(request.form.get('question_count', 0))
+        
+        for i in range(question_count):
+            question_text = request.form.get(f'question_{i}_text')
+            if question_text:
+                choices = []
+                choice_count = int(request.form.get(f'question_{i}_choice_count', 0))
+                
+                for j in range(choice_count):
+                    choice_text = request.form.get(f'question_{i}_choice_{j}_text')
+                    is_correct = request.form.get(f'question_{i}_choice_{j}_correct') == 'on'
+                    
+                    if choice_text:
+                        choices.append({
+                            'text': choice_text,
+                            'correct': is_correct
+                        })
+                
+                questions_data.append({
+                    'text': question_text,
+                    'choices': choices
+                })
+        
+        # Sauvegarder la configuration
+        config_file = os.path.join(project_path, 'qcm_config.json')
+        with open(config_file, 'w') as f:
+            json.dump(questions_data, f, indent=2)
+        
+        # Créer le fichier LaTeX
+        try:
+            amc = AMCManager(project_path)
+            latex_file = amc.create_latex_template(questions_data)
+            flash('Configuration du QCM sauvegardée avec succès!', 'success')
+        except Exception as e:
+            flash(f'Erreur lors de la création du LaTeX: {str(e)}', 'error')
+        
+        return redirect(url_for('project_detail', project_id=project_id))
+    
+    # Charger la configuration existante si elle existe
+    config_file = os.path.join(project_path, 'qcm_config.json')
+    existing_config = []
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            existing_config = json.load(f)
+    
+    return render_template('configure_qcm.html', 
+                         project=project_info, 
+                         project_id=project_id,
+                         existing_config=existing_config,
+                         sample_questions=SAMPLE_QUESTIONS,
+                         scoring_strategies=SCORING_STRATEGIES)
 
 if __name__ == '__main__':
     app.run(debug=True)

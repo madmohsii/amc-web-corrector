@@ -1,0 +1,59 @@
+<!-- ============================================ -->
+<!-- templates/projects.html -->
+{% extends "base.html" %}
+
+{% block title %}Mes Projets - AMC Web Corrector{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>Mes Projets</h1>
+            <p>Gérez vos projets de correction de QCM</p>
+        </div>
+        <a href="{{ url_for('create_project') }}" class="btn">Nouveau Projet</a>
+    </div>
+</div>
+
+{% if projects %}
+    <div class="project-grid">
+        {% for project in projects %}
+        <div class="project-card">
+            <h3>{{ project.name }}</h3>
+            <div class="project-meta">
+                <p>📅 Créé le {{ project.created[:10] }}</p>
+                <p>🆔 ID: {{ project.id }}</p>
+            </div>
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="{{ url_for('project_detail', project_id=project.folder) }}" class="btn">
+                    Ouvrir
+                </a>
+                <button onclick="deleteProject('{{ project.folder }}')" class="btn btn-danger">
+                    Supprimer
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="card">
+        <div style="text-align: center; padding: 2rem;">
+            <h2>Aucun projet trouvé</h2>
+            <p>Commencez par créer votre premier projet de correction</p>
+            <a href="{{ url_for('create_project') }}" class="btn" style="margin-top: 1rem;">
+                Créer mon premier projet
+            </a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteProject(projectId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.')) {
+        alert('Fonctionnalité de suppression à implémenter');
+    }
+}
+</script>
+{% endblock %}

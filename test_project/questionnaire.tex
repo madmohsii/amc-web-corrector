@@ -1,0 +1,60 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[francais,bloc]{automultiplechoice}
+\usepackage{multicol}
+
+% Configuration AMC
+\geometry{hmargin=2cm,headheight=2cm}
+\AMCrandomseed{1234567}
+\AMCboxDimensions{shape=oval}
+
+\begin{document}
+
+% En-tête du questionnaire
+\noindent{\bf QCM} \hfill \champnom{\fbox{%
+    \begin{minipage}{.5\linewidth}
+      Nom et prénom:\\[.5cm]\dotfill\\[.5cm]\dotfill
+    \end{minipage}%
+  }}
+
+\begin{center}\em
+Instructions: Noircissez complètement les cases correspondant aux bonnes réponses.
+\end{center}
+
+\champnom{\fbox{%
+  \begin{minipage}{4cm}
+    \vspace*{.5cm}\dotfill\\
+    \vspace*{.5cm}\dotfill\\
+    \vspace*{1mm}
+  \end{minipage}%
+}}
+
+\AMCcleardoublepage
+
+% Questions
+\begin{multicols}{2}
+
+
+\begin{question}{q1}
+  Quelle est la capitale de la France ?
+  \begin{choices}
+    \correctchoice{Paris}
+    \wrongchoice{Londres}
+    \wrongchoice{Berlin}
+    \wrongchoice{Madrid}
+  \end{choices}
+\end{question}
+
+\begin{question}{q2}
+  Combien font 2 + 2 ?
+  \begin{choices}
+    \wrongchoice{3}
+    \correctchoice{4}
+    \wrongchoice{5}
+    \wrongchoice{6}
+  \end{choices}
+\end{question}
+
+\end{multicols}
+\end{document}

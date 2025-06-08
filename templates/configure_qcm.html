@@ -1,0 +1,115 @@
+% extends "base.html" %}
+
+{% block title %}Configuration QCM - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>📝 Configuration du QCM</h1>
+            <p>Projet: {{ project.name }}</p>
+        </div>
+        <a href="{{ url_for('project_detail', project_id=project_id) }}" class="btn btn-secondary">Retour</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🎯 Options rapides</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+        <button onclick="loadSampleQCM()" class="btn btn-secondary">
+            📚 Charger un QCM d'exemple
+        </button>
+        <button onclick="addQuestion()" class="btn">
+            ➕ Ajouter une question
+        </button>
+        <button onclick="clearAll()" class="btn btn-danger">
+            🗑️ Vider tout
+        </button>
+    </div>
+</div>
+
+<form method="POST" id="qcmForm">
+    <input type="hidden" id="questionCount" name="question_count" value="0">
+    
+    <div class="card">
+        <h2>❓ Questions</h2>
+        <div id="questionsContainer">
+            <!-- Les questions seront ajoutées ici dynamiquement -->
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <button type="button" onclick="addQuestion()" class="btn btn-secondary">
+                ➕ Ajouter une question
+            </button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>⚙️ Configuration de notation</h2>
+        <div class="form-group">
+            <label for="scoring_strategy">Stratégie de notation</label>
+            <select id="scoring_strategy" name="scoring_strategy">
+                {% for key, strategy in scoring_strategies.items() %}
+                <option value="{{ key }}">{{ strategy.name }} - {{ strategy.description }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button type="submit" class="btn">💾 Sauvegarder la configuration</button>
+            <button type="button" onclick="previewLatex()" class="btn btn-secondary">👁️ Aperçu LaTeX</button>
+        </div>
+    </div>
+</form>
+
+<!-- Modal aperçu LaTeX -->
+<div id="latexModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; max-width: 80%; width: 600px; max-height: 80%; overflow-y: auto;">
+        <h3>📄 Aperçu du code LaTeX</h3>
+        <pre id="latexPreview" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; overflow-x: auto; font-size: 0.9rem;"></pre>
+        <button onclick="closeLatexModal()" class="btn">Fermer</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let questionCounter = 0;
+
+// Charger la configuration existante si elle existe
+{% if existing_config %}
+const existingConfig = {{ existing_config | tojson }};
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfiguration(existingConfig);
+});
+{% endif %}
+
+function addQuestion(questionData = null) {
+    const container = document.getElementById('questionsContainer');
+    const questionIndex = questionCounter++;
+    
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'question-block';
+    questionDiv.style.cssText = 'border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; background: #fafafa;';
+    questionDiv.id = `question_${questionIndex}`;
+    
+    questionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4>Question ${questionIndex + 1}</h4>
+            <button type="button" onclick="removeQuestion(${questionIndex})" class="btn btn-danger" style="padding: 5px 10px;">✕</button>
+        </div>
+        
+        <div class="form-group">
+            <label>Texte de la question *</label>
+            <textarea name="question_${questionIndex}_text" rows="2" placeholder="Saisissez votre question..." required>${questionData ? questionData.text : ''}</textarea>
+        </div>
+        
+        <div class="choices-container" id="choices_${questionIndex}">
+            <label>Choix de réponses :</label>
+            <div id="choicesContainer_${questionIndex}">
+                <!-- Les choix seront ajoutés ici -->
+            </div>
+            <button type="button" onclick="addChoice(${questionIndex})" class="btn btn-secondary" style="margin-top: 0.5rem; padding: 5px 15px;">+ Ajouter un choix</button>
+        </div>
