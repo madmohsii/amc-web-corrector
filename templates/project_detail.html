@@ -1,4 +1,4 @@
-% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}{{ project.name }} - AMC Web Corrector{% endblock %}
 
@@ -16,8 +16,24 @@
 <!-- Zone d'upload -->
 <div class="card">
     <h2>📤 Upload des copies</h2>
-    <div id="enhancedUploader">
-        <!-- L'interface sera créée par JavaScript -->
+    <div class="upload-zone" style="border: 2px dashed #667eea; border-radius: 15px; padding: 3rem; text-align: center; background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%); cursor: pointer;" onclick="document.getElementById('fileInput').click()">
+        <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.7;">📁</div>
+        <h3>Glissez vos fichiers ici ou cliquez pour sélectionner</h3>
+        <p style="color: #666; font-size: 0.9rem; margin: 1rem 0;">PDF, PNG, JPG, JPEG • Max 50MB par fichier</p>
+        <input type="file" id="fileInput" multiple accept=".pdf,.png,.jpg,.jpeg" style="display: none;">
+        <button class="btn" style="margin-top: 1rem;">
+            📂 Choisir les fichiers
+        </button>
+    </div>
+    
+    <div id="uploadProgress" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+        <h4>Upload en cours...</h4>
+        <div id="progressContainer"></div>
+    </div>
+    
+    <div id="filesList" style="margin-top: 2rem;">
+        <h4>📋 Fichiers uploadés</h4>
+        <div id="filesContainer"></div>
     </div>
 </div>
 
@@ -80,7 +96,7 @@ const projectId = '{{ project_id }}';
 // Configuration du drag & drop
 document.addEventListener('DOMContentLoaded', function() {
     const uploadArea = document.getElementById('uploadArea');
-    setupDragDrop(uploadArea);
+   // setupDragDrop(uploadArea);
 });
 
 function handleFileSelect(files) {
@@ -187,5 +203,98 @@ function exportResults() {
     // Ici vous pourriez ajouter l'export des résultats
     alert('Fonctionnalité d\'export à implémenter');
 }
+
+// Upload simple fonctionnel
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const files = e.target.files;
+    if (files.length > 0) {
+        document.getElementById('uploadProgress').style.display = 'block';
+        Array.from(files).forEach(file => uploadFileSimple(file));
+    }
+});
+
+function uploadFileSimple(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Ajouter à la liste des uploads en cours
+    addProgressItem(file.name);
+    
+    fetch(`/upload/${projectId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addFileToList(file.name);
+            updateProgressItem(file.name, true);
+        } else {
+            updateProgressItem(file.name, false, data.error);
+        }
+    })
+    .catch(error => {
+        updateProgressItem(file.name, false, error.message);
+    });
+}
+
+function addProgressItem(filename) {
+    const container = document.getElementById('progressContainer');
+    const div = document.createElement('div');
+    div.id = `progress-${filename}`;
+    div.style.cssText = 'margin-bottom: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px;';
+    div.innerHTML = `<span>📤 ${filename}</span> <span class="status">En cours...</span>`;
+    container.appendChild(div);
+}
+
+function updateProgressItem(filename, success, error = '') {
+    const item = document.getElementById(`progress-${filename}`);
+    if (item) {
+        const status = item.querySelector('.status');
+        if (success) {
+            status.innerHTML = '✅ Terminé';
+            status.style.color = '#28a745';
+        } else {
+            status.innerHTML = `❌ Erreur: ${error}`;
+            status.style.color = '#dc3545';
+        }
+    }
+}
+
+function addFileToList(filename) {
+    const container = document.getElementById('filesContainer');
+    const div = document.createElement('div');
+    div.style.cssText = 'padding: 1rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #28a745;';
+    div.innerHTML = `
+        <div>
+            <span>📄</span>
+            <strong>${filename}</strong>
+            <div style="color: #666; font-size: 0.9rem;">Uploadé avec succès</div>
+        </div>
+        <button class="btn btn-danger" onclick="deleteFileSimple('${filename}')" style="padding: 8px 16px;">🗑️ Supprimer</button>
+    `;
+    container.appendChild(div);
+}
+
+function deleteFileSimple(filename) {
+    if (confirm(`Supprimer ${filename} ?`)) {
+        fetch(`/delete/${projectId}/${filename}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        });
+    }
+}
+
+// Charger les fichiers existants
+fetch(`/api/project/${projectId}/files`)
+.then(response => response.json())
+.then(files => {
+    files.forEach(filename => addFileToList(filename));
+});
 </script>
 {% endblock %}

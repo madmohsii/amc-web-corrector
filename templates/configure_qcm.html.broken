@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+% extends "base.html" %}
 
 {% block title %}Configuration QCM - {{ project.name }}{% endblock %}
 
@@ -49,9 +49,9 @@
         <div class="form-group">
             <label for="scoring_strategy">Stratégie de notation</label>
             <select id="scoring_strategy" name="scoring_strategy">
-                <option value="default">Standard - Bonne: +1, Mauvaise: 0, Vide: 0</option>
-                <option value="negative">Avec pénalité - Bonne: +1, Mauvaise: -0.5, Vide: 0</option>
-                <option value="strict">Strict - Bonne: +1, Mauvaise: -1, Vide: 0</option>
+                {% for key, strategy in scoring_strategies.items() %}
+                <option value="{{ key }}">{{ strategy.name }} - {{ strategy.description }}</option>
+                {% endfor %}
             </select>
         </div>
     </div>
@@ -59,30 +59,19 @@
     <div class="card">
         <div style="display: flex; gap: 1rem; justify-content: center;">
             <button type="submit" class="btn">💾 Sauvegarder la configuration</button>
-            <button type="button" onclick="alert('Aperçu LaTeX à implémenter')" class="btn btn-secondary">👁️ Aperçu LaTeX</button>
+            <button type="button" onclick="previewLatex()" class="btn btn-secondary">👁️ Aperçu LaTeX</button>
         </div>
     </div>
 </form>
 
-<style>
-.question-block {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    background: #fafafa;
-}
-
-.choice-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    padding: 0.5rem;
-    background: white;
-    border-radius: 5px;
-}
-</style>
+<!-- Modal aperçu LaTeX -->
+<div id="latexModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; max-width: 80%; width: 600px; max-height: 80%; overflow-y: auto;">
+        <h3>📄 Aperçu du code LaTeX</h3>
+        <pre id="latexPreview" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; overflow-x: auto; font-size: 0.9rem;"></pre>
+        <button onclick="closeLatexModal()" class="btn">Fermer</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -90,12 +79,12 @@
 let questionCounter = 0;
 
 // Charger la configuration existante si elle existe
-const existingConfig = {{ existing_config | tojson if existing_config else '[]' }};
-if (existingConfig.length > 0) {
-    document.addEventListener('DOMContentLoaded', function() {
-        loadConfiguration(existingConfig);
-    });
-}
+{% if existing_config %}
+const existingConfig = {{ existing_config | tojson }};
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfiguration(existingConfig);
+});
+{% endif %}
 
 function addQuestion(questionData = null) {
     const container = document.getElementById('questionsContainer');
@@ -103,7 +92,8 @@ function addQuestion(questionData = null) {
     
     const questionDiv = document.createElement('div');
     questionDiv.className = 'question-block';
-    questionDiv.id = 'question_' + questionIndex;
+    questionDiv.style.cssText = 'border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; background: #fafafa;';
+    questionDiv.id = `question_${questionIndex}`;
     
     questionDiv.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -116,23 +106,25 @@ function addQuestion(questionData = null) {
             <textarea name="question_${questionIndex}_text" rows="2" placeholder="Saisissez votre question..." required>${questionData ? questionData.text : ''}</textarea>
         </div>
         
-        <div>
+        <div class="choices-container" id="choices_${questionIndex}">
             <label>Choix de réponses :</label>
-            <div id="choicesContainer_${questionIndex}"></div>
+            <div id="choicesContainer_${questionIndex}">
+                <!-- Les choix seront ajoutés ici -->
+            </div>
             <button type="button" onclick="addChoice(${questionIndex})" class="btn btn-secondary" style="margin-top: 0.5rem; padding: 5px 15px;">+ Ajouter un choix</button>
         </div>
-        
-        <input type="hidden" name="question_${questionIndex}_choice_count" id="choiceCount_${questionIndex}" value="0">
+<input type="hidden" name="question_${questionIndex}_choice_count" id="choiceCount_${questionIndex}" value="0">
     `;
     
     container.appendChild(questionDiv);
     
-    // Ajouter des choix
+    // Ajouter des choix par défaut ou existants
     if (questionData && questionData.choices) {
         questionData.choices.forEach(choice => {
             addChoice(questionIndex, choice);
         });
     } else {
+        // Ajouter 4 choix par défaut
         for (let i = 0; i < 4; i++) {
             addChoice(questionIndex);
         }
@@ -142,7 +134,7 @@ function addQuestion(questionData = null) {
 }
 
 function removeQuestion(questionIndex) {
-    const questionDiv = document.getElementById('question_' + questionIndex);
+    const questionDiv = document.getElementById(`question_${questionIndex}`);
     if (questionDiv) {
         questionDiv.remove();
         updateQuestionCount();
@@ -150,13 +142,13 @@ function removeQuestion(questionIndex) {
 }
 
 function addChoice(questionIndex, choiceData = null) {
-    const container = document.getElementById('choicesContainer_' + questionIndex);
-    const choiceCountInput = document.getElementById('choiceCount_' + questionIndex);
+    const container = document.getElementById(`choicesContainer_${questionIndex}`);
+    const choiceCountInput = document.getElementById(`choiceCount_${questionIndex}`);
     const choiceIndex = parseInt(choiceCountInput.value);
     
     const choiceDiv = document.createElement('div');
-    choiceDiv.className = 'choice-item';
-    choiceDiv.id = 'choice_' + questionIndex + '_' + choiceIndex;
+    choiceDiv.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px;';
+    choiceDiv.id = `choice_${questionIndex}_${choiceIndex}`;
     
     choiceDiv.innerHTML = `
         <input type="checkbox" name="question_${questionIndex}_choice_${choiceIndex}_correct" 
@@ -174,7 +166,7 @@ function addChoice(questionIndex, choiceData = null) {
 }
 
 function removeChoice(questionIndex, choiceIndex) {
-    const choiceDiv = document.getElementById('choice_' + questionIndex + '_' + choiceIndex);
+    const choiceDiv = document.getElementById(`choice_${questionIndex}_${choiceIndex}`);
     if (choiceDiv) {
         choiceDiv.remove();
     }
@@ -190,28 +182,7 @@ function loadSampleQCM() {
         document.getElementById('questionsContainer').innerHTML = '';
         questionCounter = 0;
         
-        // Questions d'exemple
-        const sampleQuestions = [
-            {
-                text: 'Quelle est la capitale de la France ?',
-                choices: [
-                    {text: 'Paris', correct: true},
-                    {text: 'Londres', correct: false},
-                    {text: 'Berlin', correct: false},
-                    {text: 'Madrid', correct: false}
-                ]
-            },
-            {
-                text: 'Combien font 2 + 2 ?',
-                choices: [
-                    {text: '3', correct: false},
-                    {text: '4', correct: true},
-                    {text: '5', correct: false},
-                    {text: '6', correct: false}
-                ]
-            }
-        ];
-        
+        const sampleQuestions = {{ sample_questions | tojson }};
         sampleQuestions.forEach(question => {
             addQuestion(question);
         });
@@ -221,6 +192,7 @@ function loadSampleQCM() {
 function loadConfiguration(config) {
     document.getElementById('questionsContainer').innerHTML = '';
     questionCounter = 0;
+    
     config.forEach(question => {
         addQuestion(question);
     });
@@ -233,5 +205,86 @@ function clearAll() {
         updateQuestionCount();
     }
 }
+
+function previewLatex() {
+    const formData = new FormData(document.getElementById('qcmForm'));
+    
+    // Construire l'aperçu LaTeX
+    let latex = `\\documentclass[a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
+\\usepackage[francais,bloc]{automultiplechoice}
+\\usepackage{multicol}
+
+\\geometry{hmargin=2cm,headheight=2cm}
+\\AMCrandomseed{1234567}
+\\AMCboxDimensions{shape=oval}
+
+\\begin{document}
+
+\\noindent{\\bf QCM} \\hfill \\champnom{\\fbox{%
+    \\begin{minipage}{.5\\linewidth}
+      Nom et prénom:\\\\[.5cm]\\dotfill\\\\[.5cm]\\dotfill
+    \\end{minipage}%
+  }}
+
+\\begin{center}\\em
+Instructions: Noircissez complètement les cases correspondant aux bonnes réponses.
+\\end{center}
+
+\\begin{multicols}{2}
+
+`;
+
+    const questionCount = parseInt(formData.get('question_count'));
+    
+    for (let i = 0; i < questionCount; i++) {
+        const questionText = formData.get(`question_${i}_text`);
+        if (questionText) {
+            latex += `\\begin{question}{q${i + 1}}
+  ${questionText}
+  \\begin{choices}
+`;
+            
+            const choiceCount = parseInt(formData.get(`question_${i}_choice_count`) || 0);
+            for (let j = 0; j < choiceCount; j++) {
+                const choiceText = formData.get(`question_${i}_choice_${j}_text`);
+                const isCorrect = formData.get(`question_${i}_choice_${j}_correct`);
+                
+                if (choiceText) {
+                    if (isCorrect) {
+                        latex += `    \\correctchoice{${choiceText}}
+`;
+                    } else {
+                        latex += `    \\wrongchoice{${choiceText}}
+`;
+                    }
+                }
+            }
+            
+            latex += `  \\end{choices}
+\\end{question}
+
+`;
+        }
+    }
+    
+    latex += `\\end{multicols}
+\\end{document}`;
+    
+    document.getElementById('latexPreview').textContent = latex;
+    document.getElementById('latexModal').style.display = 'block';
+}
+
+function closeLatexModal() {
+    document.getElementById('latexModal').style.display = 'none';
+}
+
+// Fermer la modal en cliquant à l'extérieur
+document.getElementById('latexModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeLatexModal();
+    }
+});
 </script>
 {% endblock %}
