@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Accueil - AMC Web Corrector{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Bienvenue sur AMC Web Corrector</h1>
+    <p>Système de correction automatique de QCM basé sur Auto Multiple Choice (AMC)</p>
+</div>
+
+<div class="project-grid">
+    <div class="project-card">
+        <h3>🏗️ Créer un Projet</h3>
+        <p>Commencez par créer un nouveau projet de correction de QCM</p>
+        <div class="project-meta">
+            <a href="{{ url_for('create_project') }}" class="btn">Nouveau Projet</a>
+        </div>
+    </div>
+
+    <div class="project-card">
+        <h3>📁 Mes Projets</h3>
+        <p>Consultez et gérez vos projets existants</p>
+        <div class="project-meta">
+            <a href="{{ url_for('list_projects') }}" class="btn btn-secondary">Voir les Projets</a>
+        </div>
+    </div>
+
+    <div class="project-card">
+        <h3>📚 Comment utiliser</h3>
+        <p>Guide d'utilisation du système AMC Web</p>
+        <div class="project-meta">
+            <button class="btn" onclick="showHelp()">Aide</button>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <h2>Processus de correction</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-top: 1rem;">
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">1️⃣</div>
+            <h4>Créer le projet</h4>
+            <p>Définissez votre nouveau projet de correction</p>
+        </div>
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">2️⃣</div>
+            <h4>Uploader les copies</h4>
+            <p>Téléchargez les copies scannées (PDF, images)</p>
+        </div>
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">3️⃣</div>
+            <h4>Lancer le traitement</h4>
+            <p>AMC analyse automatiquement les réponses</p>
+        </div>
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">4️⃣</div>
+            <h4>Consulter les résultats</h4>
+            <p>Obtenez les notes et statistiques</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'aide -->
+<div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; max-width: 600px; width: 90%;">
+        <h3>Guide d'utilisation</h3>
+        <div style="margin: 1rem 0;">
+            <h4>Prérequis :</h4>
+            <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                <li>AMC doit être installé sur le serveur</li>
+                <li>Copies scannées en format PDF ou image</li>
+                <li>QCM créé avec le format AMC (LaTeX)</li>
+            </ul>
+            
+            <h4 style="margin-top: 1rem;">Étapes :</h4>
+            <ol style="margin-left: 2rem; margin-top: 0.5rem;">
+                <li>Créez un nouveau projet</li>
+                <li>Uploadez vos copies scannées</li>
+                <li>Lancez le traitement automatique</li>
+                <li>Consultez les résultats et exportez les notes</li>
+            </ol>
+        </div>
+        <button onclick="hideHelp()" class="btn">Fermer</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showHelp() {
+    document.getElementById('helpModal').style.display = 'block';
+}
+
+function hideHelp() {
+    document.getElementById('helpModal').style.display = 'none';
+}
+
+// Fermer la modal en cliquant à l'extérieur
+document.getElementById('helpModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        hideHelp();
+    }
+});
+</script>
+{% endblock %}
