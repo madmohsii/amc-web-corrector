@@ -59,21 +59,154 @@ def index():
 
 @app.route('/download_qcm/<project_id>')
 def download_qcm(project_id):
-    """Version debug pour diagnostiquer"""
+    """Télécharger le QCM en PDF"""
     try:
         project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-        latex_file = os.path.join(project_path, 'questionnaire.tex')
         
-        # Version ultra-simple : juste télécharger le fichier
-        if os.path.exists(latex_file):
-            return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
+        if not os.path.exists(project_path):
+            flash('Projet non trouvé', 'error')
+            return redirect(url_for('list_projects'))
+        
+        # Utiliser AMCManager pour générer le PDF
+        amc = AMCManager(project_path)
+        
+        # Vérifier s'il y a un fichier LaTeX
+        latex_file = os.path.join(project_path, 'questionnaire.tex')
+        if not os.path.exists(latex_file):
+            # Créer un QCM de base s'il n'existe pas
+            config_file = os.path.join(project_path, 'qcm_config.json')
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    questions_data = json.load(f)
+                    # Adapter le format si nécessaire
+                    formatted_questions = []
+                    for i, q in enumerate(questions_data):
+                        formatted_q = {
+                            'id': f'q{i+1}',
+                            'text': q.get('text', ''),
+                            'choices': q.get('choices', []),
+                            'comment': f'Question {i+1}'
+                        }
+                        formatted_questions.append(formatted_q)
+                    amc.create_complete_questionnaire(formatted_questions)
+            else:
+                # Utiliser les questions d'exemple
+                formatted_sample = []
+                for i, q in enumerate(SAMPLE_QUESTIONS):
+                    formatted_q = {
+                        'id': f'q{i+1}',
+                        'text': q.get('text', ''),
+                        'choices': q.get('choices', []),
+                        'comment': f'Question d\'exemple {i+1}'
+                    }
+                    formatted_sample.append(formatted_q)
+                amc.create_complete_questionnaire(formatted_sample)
+        
+        # Préparer le projet (compilation LaTeX vers PDF)
+        result = amc.prepare_project()
+        
+        if not result['success']:
+            flash(f'Erreur compilation LaTeX: {result.get("stderr", "Erreur inconnue")}', 'error')
+            # En cas d'échec, proposer le téléchargement du LaTeX
+            if os.path.exists(latex_file):
+                return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
+            else:
+                return redirect(url_for('project_detail', project_id=project_id))
+        
+        # Chercher le PDF généré
+        possible_pdf_paths = [
+            os.path.join(project_path, 'amc-compiled.pdf'),
+            os.path.join(project_path, 'questionnaire_output.pdf'),
+            os.path.join(project_path, 'questionnaire.pdf')
+        ]
+        
+        pdf_file = None
+        for pdf_path in possible_pdf_paths:
+            if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000:  # Vérifier que le fichier n'est pas vide
+                pdf_file = pdf_path
+                break
+        
+        if pdf_file:
+            # Créer un nom de fichier plus descriptif
+            with open(os.path.join(project_path, 'project_info.json'), 'r') as f:
+                project_info = json.load(f)
+                project_name = project_info.get('name', 'qcm')
+            
+            download_name = f"{project_name}_{project_id}.pdf"
+            return send_file(pdf_file, as_attachment=True, download_name=download_name)
         else:
-            flash('Fichier QCM non trouvé', 'error')
-            return redirect(url_for('project_detail', project_id=project_id))
+            flash('PDF non généré ou vide', 'error')
+            # Fallback vers le LaTeX
+            if os.path.exists(latex_file):
+                return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
+            else:
+                flash('Aucun fichier à télécharger', 'error')
+                return redirect(url_for('project_detail', project_id=project_id))
             
     except Exception as e:
-        flash(f'Erreur téléchargement: {str(e)}', 'error')
+        flash(f'Erreur: {str(e)}', 'error')
         return redirect(url_for('project_detail', project_id=project_id))
+
+@app.route('/preview_qcm/<project_id>')
+def preview_qcm(project_id):
+    """Prévisualiser le QCM (génère le PDF et l'affiche dans le navigateur)"""
+    try:
+        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+        
+        if not os.path.exists(project_path):
+            flash('Projet non trouvé', 'error')
+            return redirect(url_for('list_projects'))
+        
+        amc = AMCManager(project_path)
+        
+        # Générer le PDF si nécessaire
+        result = amc.prepare_project()
+        
+        if result['success']:
+            possible_pdf_paths = [
+                os.path.join(project_path, 'amc-compiled.pdf'),
+                os.path.join(project_path, 'questionnaire_output.pdf'),
+                os.path.join(project_path, 'questionnaire.pdf')
+            ]
+            
+            for pdf_path in possible_pdf_paths:
+                if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000:
+                    return send_file(pdf_path, mimetype='application/pdf')
+        
+        flash('Impossible de générer la prévisualisation', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
+        
+    except Exception as e:
+        flash(f'Erreur: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
+
+@app.route('/generate_pdf/<project_id>')
+def generate_pdf(project_id):
+    """Force la régénération du PDF"""
+    try:
+        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+        amc = AMCManager(project_path)
+        
+        # Nettoyer les anciens PDFs
+        for pdf_file in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
+            pdf_path = os.path.join(project_path, pdf_file)
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        
+        # Régénérer
+        result = amc.prepare_project()
+        
+        if result['success']:
+            flash('PDF généré avec succès', 'success')
+        else:
+            flash(f'Erreur génération PDF: {result.get("stderr", "Erreur inconnue")}', 'error')
+        
+        return redirect(url_for('project_detail', project_id=project_id))
+        
+    except Exception as e:
+        flash(f'Erreur: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
+
 @app.route('/create_project', methods=['GET', 'POST'])
 def create_project():
     if request.method == 'POST':
@@ -89,12 +222,8 @@ def create_project():
         try:
             os.makedirs(project_path, exist_ok=True)
             
-            # Créer la structure AMC
-            data_path = os.path.join(project_path, 'data')
-            cr_path = os.path.join(project_path, 'cr')
-            
-            os.makedirs(data_path, exist_ok=True)
-            os.makedirs(cr_path, exist_ok=True)
+            # Créer la structure AMC avec AMCManager
+            amc = AMCManager(project_path)
             
             # Sauvegarder les métadonnées du projet
             project_info = {
@@ -128,6 +257,15 @@ def list_projects():
                     with open(info_file, 'r') as f:
                         project_info = json.load(f)
                         project_info['folder'] = project_folder
+                        
+                        # Vérifier si un PDF existe
+                        pdf_exists = False
+                        for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
+                            if os.path.exists(os.path.join(project_path, pdf_name)):
+                                pdf_exists = True
+                                break
+                        project_info['pdf_ready'] = pdf_exists
+                        
                         projects.append(project_info)
                 except:
                     pass
@@ -152,10 +290,22 @@ def project_detail(project_id):
     if os.path.exists(uploads_path):
         uploaded_files = os.listdir(uploads_path)
     
+    # Vérifier si un PDF existe
+    pdf_exists = False
+    for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
+        if os.path.exists(os.path.join(project_path, pdf_name)):
+            pdf_exists = True
+            break
+    
+    # Vérifier si un LaTeX existe
+    latex_exists = os.path.exists(os.path.join(project_path, 'questionnaire.tex'))
+    
     return render_template('project_detail.html', 
                          project=project_info, 
                          project_id=project_id,
-                         uploaded_files=uploaded_files)
+                         uploaded_files=uploaded_files,
+                         pdf_exists=pdf_exists,
+                         latex_exists=latex_exists)
 
 @app.route('/upload/<project_id>', methods=['POST'])
 def upload_file(project_id):
@@ -195,11 +345,20 @@ def process_project(project_id):
         # Vérifier s'il y a un fichier LaTeX, sinon créer un exemple
         latex_file = os.path.join(project_path, 'questionnaire.tex')
         if not os.path.exists(latex_file):
-            # Créer un QCM de test
-            amc.create_latex_template(SAMPLE_QUESTIONS)
+            # Créer un QCM de test avec le bon format
+            formatted_sample = []
+            for i, q in enumerate(SAMPLE_QUESTIONS):
+                formatted_q = {
+                    'id': f'q{i+1}',
+                    'text': q.get('text', ''),
+                    'choices': q.get('choices', []),
+                    'comment': f'Question d\'exemple {i+1}'
+                }
+                formatted_sample.append(formatted_q)
+            amc.create_complete_questionnaire(formatted_sample)
         
-        # Processus complet
-        results = amc.full_process(scoring_strategy='default')
+        # Processus complet avec scoring français
+        results = amc.full_process(scoring_strategy='french', scan_path=uploads_path)
         
         # Formater les résultats pour l'affichage
         formatted_results = []
@@ -209,7 +368,8 @@ def process_project(project_id):
                 'success': result.get('success', False),
                 'stdout': result.get('stdout', ''),
                 'stderr': result.get('stderr', ''),
-                'error': result.get('error', '')
+                'error': result.get('error', ''),
+                'info': result.get('info', '')
             })
         
         return jsonify({
@@ -228,15 +388,17 @@ def process_project(project_id):
 def view_results(project_id):
     project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
     results_path = os.path.join(project_path, 'cr')
+    exports_path = os.path.join(project_path, 'exports')
     
     # Ici vous devriez parser les résultats AMC
     # Pour le moment, on affiche juste les fichiers générés
     
     results = []
-    if os.path.exists(results_path):
-        for file in os.listdir(results_path):
-            if file.endswith('.csv') or file.endswith('.pdf'):
-                results.append(file)
+    for path in [results_path, exports_path]:
+        if os.path.exists(path):
+            for file in os.listdir(path):
+                if file.endswith('.csv') or file.endswith('.pdf') or file.endswith('.ods'):
+                    results.append(file)
     
     return render_template('results.html', 
                          project_id=project_id, 
@@ -258,6 +420,11 @@ def configure_project(project_id):
         # Traiter la configuration du QCM
         questions_data = []
         
+        # Récupérer les paramètres généraux
+        title = request.form.get('title', 'QCM')
+        subject = request.form.get('subject', '')
+        duration = request.form.get('duration', '60 minutes')
+        
         # Récupérer les questions du formulaire
         question_count = int(request.form.get('question_count', 0))
         
@@ -278,19 +445,32 @@ def configure_project(project_id):
                         })
                 
                 questions_data.append({
+                    'id': f'q{i+1}',
                     'text': question_text,
-                    'choices': choices
+                    'choices': choices,
+                    'comment': f'Question {i+1}'
                 })
         
         # Sauvegarder la configuration
         config_file = os.path.join(project_path, 'qcm_config.json')
-        with open(config_file, 'w') as f:
-            json.dump(questions_data, f, indent=2)
+        config = {
+            'title': title,
+            'subject': subject,
+            'duration': duration,
+            'questions': questions_data
+        }
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
         
-        # Créer le fichier LaTeX
+        # Créer le fichier LaTeX avec AMCManager
         try:
             amc = AMCManager(project_path)
-            latex_file = amc.create_latex_template(questions_data)
+            latex_file = amc.create_complete_questionnaire(
+                questions_data, 
+                title=title, 
+                subject=subject, 
+                duration=duration
+            )
             flash('Configuration du QCM sauvegardée avec succès!', 'success')
         except Exception as e:
             flash(f'Erreur lors de la création du LaTeX: {str(e)}', 'error')
@@ -299,9 +479,14 @@ def configure_project(project_id):
     
     # Charger la configuration existante si elle existe
     config_file = os.path.join(project_path, 'qcm_config.json')
-    existing_config = []
+    existing_config = {
+        'title': 'QCM',
+        'subject': '',
+        'duration': '60 minutes',
+        'questions': []
+    }
     if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
+        with open(config_file, 'r', encoding='utf-8') as f:
             existing_config = json.load(f)
     
     return render_template('configure_qcm.html', 
@@ -310,9 +495,6 @@ def configure_project(project_id):
                          existing_config=existing_config,
                          sample_questions=SAMPLE_QUESTIONS,
                          scoring_strategies=SCORING_STRATEGIES)
-
-
-
 
 @app.route('/api/project/<project_id>/files')
 def api_project_files(project_id):
