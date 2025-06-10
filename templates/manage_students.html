@@ -1,0 +1,296 @@
+<!-- templates/manage_students.html -->
+{% extends "base.html" %}
+
+{% block title %}Gestion des Élèves - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1>👥 Gestion des Élèves</h1>
+            <p>Projet: {{ project.name }}</p>
+        </div>
+        <a href="{{ url_for('project_detail', project_id=project_id) }}" class="btn btn-secondary">Retour</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📋 Options rapides</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <button onclick="addStudents(5)" class="btn btn-secondary">
+            ➕ Ajouter 5 élèves
+        </button>
+        <button onclick="addStudents(10)" class="btn btn-secondary">
+            ➕ Ajouter 10 élèves
+        </button>
+        <button onclick="addStudents(20)" class="btn btn-secondary">
+            ➕ Ajouter 20 élèves
+        </button>
+        <button onclick="clearAll()" class="btn btn-danger">
+            🗑️ Vider tout
+        </button>
+        <button onclick="importCSV()" class="btn">
+            📁 Importer CSV
+        </button>
+        <button onclick="generateCodes()" class="btn">
+            🔢 Générer codes auto
+        </button>
+    </div>
+</div>
+
+<form method="POST" id="studentsForm">
+    <input type="hidden" id="studentCount" name="student_count" value="0">
+    
+    <div class="card">
+        <h2>👥 Liste des Élèves</h2>
+        <div id="studentsContainer">
+            <!-- Les élèves seront ajoutés ici -->
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <button type="button" onclick="addStudent()" class="btn btn-secondary">
+                ➕ Ajouter un élève
+            </button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button type="submit" class="btn">💾 Sauvegarder la liste</button>
+            <button type="button" onclick="previewCodes()" class="btn btn-secondary">👁️ Aperçu des codes</button>
+        </div>
+    </div>
+</form>
+
+<!-- Modal d'import CSV -->
+<div id="csvModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; max-width: 600px; width: 90%;">
+        <h3>📁 Importer un fichier CSV</h3>
+        <p style="margin: 1rem 0; color: #666;">Format attendu: nom,prenom,code (optionnel)</p>
+        
+        <div style="margin: 1rem 0;">
+            <label for="csvFile">Fichier CSV:</label>
+            <input type="file" id="csvFile" accept=".csv" style="margin-top: 0.5rem;">
+        </div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <button onclick="processCSV()" class="btn">Importer</button>
+            <button onclick="closeCSVModal()" class="btn btn-secondary">Annuler</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.student-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr 120px 60px;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border-left: 4px solid #667eea;
+}
+
+.student-item input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.student-number {
+    background: #667eea;
+    color: white;
+    padding: 8px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.code-input {
+    font-family: monospace;
+    font-weight: bold;
+    text-align: center;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let studentCounter = 0;
+
+// Charger les élèves existants si ils existent
+const existingStudents = {{ students | tojson if students else '[]' }};
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingStudents.length > 0) {
+        loadExistingStudents(existingStudents);
+    } else {
+        addStudent(); // Ajouter un élève par défaut
+    }
+});
+
+function addStudent(studentData = null) {
+    const container = document.getElementById('studentsContainer');
+    const studentIndex = studentCounter++;
+    
+    const studentDiv = document.createElement('div');
+    studentDiv.className = 'student-item';
+    studentDiv.id = `student_${studentIndex}`;
+    
+    const studentNumber = studentIndex + 1;
+    const defaultCode = String(studentNumber).padStart(3, '0');
+    
+    studentDiv.innerHTML = `
+        <input type="text" name="student_${studentIndex}_nom" 
+               placeholder="Nom de famille" 
+               value="${studentData ? studentData.nom : ''}" 
+               required style="text-transform: uppercase;">
+        
+        <input type="text" name="student_${studentIndex}_prenom" 
+               placeholder="Prénom" 
+               value="${studentData ? studentData.prenom : ''}" 
+               required style="text-transform: capitalize;">
+        
+        <input type="text" name="student_${studentIndex}_code" 
+               placeholder="Code" 
+               class="code-input"
+               value="${studentData ? studentData.code : defaultCode}" 
+               maxlength="3" 
+               pattern="[0-9]{1,3}">
+        
+        <button type="button" onclick="removeStudent(${studentIndex})" 
+                class="btn btn-danger" style="padding: 8px; font-size: 0.9rem;">✕</button>
+    `;
+    
+    container.appendChild(studentDiv);
+    updateStudentCount();
+}
+
+function removeStudent(studentIndex) {
+    const studentDiv = document.getElementById(`student_${studentIndex}`);
+    if (studentDiv) {
+        studentDiv.remove();
+        updateStudentCount();
+    }
+}
+
+function addStudents(count) {
+    for (let i = 0; i < count; i++) {
+        addStudent();
+    }
+}
+
+function updateStudentCount() {
+    const students = document.querySelectorAll('.student-item');
+    document.getElementById('studentCount').value = students.length;
+}
+
+function loadExistingStudents(students) {
+    document.getElementById('studentsContainer').innerHTML = '';
+    studentCounter = 0;
+    students.forEach(student => {
+        addStudent(student);
+    });
+}
+
+function clearAll() {
+    if (confirm('Supprimer tous les élèves ?')) {
+        document.getElementById('studentsContainer').innerHTML = '';
+        studentCounter = 0;
+        updateStudentCount();
+    }
+}
+
+function generateCodes() {
+    const students = document.querySelectorAll('.student-item');
+    students.forEach((student, index) => {
+        const codeInput = student.querySelector('input[name*="_code"]');
+        if (codeInput) {
+            codeInput.value = String(index + 1).padStart(3, '0');
+        }
+    });
+}
+
+function importCSV() {
+    document.getElementById('csvModal').style.display = 'block';
+}
+
+function closeCSVModal() {
+    document.getElementById('csvModal').style.display = 'none';
+}
+
+function processCSV() {
+    const fileInput = document.getElementById('csvFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Veuillez sélectionner un fichier CSV');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const csv = e.target.result;
+        const lines = csv.split('\n');
+        const students = [];
+        
+        // Ignorer la première ligne si c'est un header
+        const startIndex = lines[0].toLowerCase().includes('nom') ? 1 : 0;
+        
+        for (let i = startIndex; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    students.push({
+                        nom: parts[0].trim().toUpperCase(),
+                        prenom: parts[1].trim(),
+                        code: parts[2] ? parts[2].trim() : String(i).padStart(3, '0')
+                    });
+                }
+            }
+        }
+        
+        if (students.length > 0) {
+            // Vider la liste actuelle
+            document.getElementById('studentsContainer').innerHTML = '';
+            studentCounter = 0;
+            
+            // Ajouter les élèves du CSV
+            students.forEach(student => {
+                addStudent(student);
+            });
+            
+            closeCSVModal();
+            alert(`${students.length} élèves importés avec succès!`);
+        } else {
+            alert('Aucun élève valide trouvé dans le fichier CSV');
+        }
+    };
+    
+    reader.readAsText(file);
+}
+
+function previewCodes() {
+    const students = document.querySelectorAll('.student-item');
+    let preview = 'Aperçu des codes élèves:\n\n';
+    
+    students.forEach((student, index) => {
+        const nom = student.querySelector('input[name*="_nom"]').value;
+        const prenom = student.querySelector('input[name*="_prenom"]').value;
+        const code = student.querySelector('input[name*="_code"]').value;
+        
+        if (nom && prenom) {
+            preview += `${code} - ${prenom} ${nom}\n`;
+        }
+    });
+    
+    alert(preview);
+}
+</script>
+{% endblock %}

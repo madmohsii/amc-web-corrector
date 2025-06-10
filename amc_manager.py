@@ -86,48 +86,65 @@ class AMCManager:
         
         return latex_file
     
-    def _generate_latex_header_french(self, title, subject, duration, instructions, csv_filename):
-        """Génère l'en-tête LaTeX AMC selon le format français"""
-        return f"""\\documentclass[12pt,a4paper]{{article}}
+    
+    def _generate_latex_header_french(self, title, subject, duration, instructions, csv_filename=None):
+    
+    
+    # Version sans CSV avec code élève simple
+        if csv_filename is None or not os.path.exists(self.project_path / csv_filename):
+            return f"""\\documentclass[12pt,a4paper]{{article}}
 
-\\usepackage{{csvsimple,graphicx,pifont}}%
+\\usepackage{{graphicx,pifont}}%
 \\usepackage[francais,bloc]{{automultiplechoice}}
 \\usepackage[utf8]{{inputenc}}    
 \\usepackage[T1]{{fontenc}}
+\\usepackage{{geometry}}
 
 \\usepackage{{verbatimbox}}
 \\usepackage{{tcolorbox}}
 
 \\newtcolorbox{{codebox}}{{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\\linewidth}}
 
+% Configuration de la géométrie pour laisser plus de place en haut
+\\geometry{{hmargin=2cm,top=4cm,bottom=2cm}}
+
 \\newcommand{{\\sujet}}{{
 	\\exemplaire{{1}}{{%
-		\\begin{{center}}
-			\\noindent{{}}\\fbox{{\\vspace*{{3mm}}
-				\\Large\\bf\\nom{{}}~\\prenom{{}}\\normalsize{{}}
-				\\vspace*{{3mm}}
+		% En-tête avec code élève simple et nom/prénom
+		\\noindent
+		\\begin{{minipage}}[t]{{0.3\\textwidth}}
+			\\textbf{{Code élève}}\\\\[0.3cm]
+			% Code élève avec 2 chiffres seulement
+			\\AMCcode{{etudiant}}{{2}}
+		\\end{{minipage}}%
+		\\hfill
+		\\begin{{minipage}}[t]{{0.65\\textwidth}}
+			\\framebox[\\textwidth]{{%
+				\\begin{{minipage}}{{0.95\\textwidth}}
+					\\centering
+					\\textbf{{Nom et prénom :}}\\\\[0.5cm]
+					\\dotfill\\\\[0.5cm]
+					\\dotfill
+				\\end{{minipage}}
 			}}
-		\\end{{center}}
+		\\end{{minipage}}
 		
-		\\begin{{center}}\\em
-			\\textbf{{{title}}}\\\\
-			{subject}\\\\
-			Durée : {duration}.\\\\
-			\\vspace{{0.2cm}}
+		\\vspace{{1cm}}
+		
+		\\begin{{center}}
+			\\textbf{{{title}}}\\\\[0.3cm]
+			{subject}\\\\[0.2cm]
+			Durée : {duration}.\\\\[0.5cm]
 			\\textbf{{{instructions}}}
 		\\end{{center}}
 		
-		\\vspace{{1ex}}
-		
-		\\begin{{center}}
-			\\textbf{{\\texttt{{}}}}
-		\\end{{center}}
+		\\vspace{{1cm}}
 		
 		\\restituegroupe{{CN}}
-		\\AMCassociation{{\\id}}
+		\\AMCrandomseed{{1237893}}
 		\\AMCaddpagesto{{4}}
-	}}
-}}
+	    }}
+    }}
 
 \\begin{{document}}
 	\\AMCrandomseed{{1237893}}
@@ -135,37 +152,110 @@ class AMCManager:
 	\\setdefaultgroupmode{{withoutreplacement}}
 
 """
+        else:
+        # Version avec CSV et code élève simple
+            return f"""\\documentclass[12pt,a4paper]{{article}}
+
+\\usepackage{{csvsimple,graphicx,pifont}}%
+\\usepackage[francais,bloc]{{automultiplechoice}}
+\\usepackage[utf8]{{inputenc}}    
+\\usepackage[T1]{{fontenc}}
+\\usepackage{{geometry}}
+
+\\usepackage{{verbatimbox}}
+\\usepackage{{tcolorbox}}
+
+\\newtcolorbox{{codebox}}{{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\\linewidth}}
+
+% Configuration de la géométrie
+\\geometry{{hmargin=2cm,top=4cm,bottom=2cm}}
+
+\\newcommand{{\\sujet}}{{
+	\\exemplaire{{1}}{{%
+		% En-tête avec code élève et nom/prénom depuis CSV
+		\\noindent
+		\\begin{{minipage}}[t]{{0.3\\textwidth}}
+			\\textbf{{Code élève}}\\\\[0.3cm]
+			% Code élève avec 2 chiffres seulement
+			\\AMCcode{{etudiant}}{{2}}
+		\\end{{minipage}}%
+		\\hfill
+		\\begin{{minipage}}[t]{{0.65\\textwidth}}
+			\\framebox[\\textwidth]{{%
+				\\begin{{minipage}}{{0.95\\textwidth}}
+					\\centering
+					\\textbf{{Nom et prénom :}} \\nom{{}} \\prenom{{}}\\\\[0.5cm]
+					\\dotfill\\\\[0.5cm]
+					\\dotfill
+				\\end{{minipage}}
+			    }}
+		\\end{{minipage}}
+		
+		\\vspace{{1cm}}
+		
+		\\begin{{center}}
+			\\textbf{{{title}}}\\\\[0.3cm]
+			{subject}\\\\[0.2cm]
+			Durée : {duration}.\\\\[0.5cm]
+			\\textbf{{{instructions}}}
+		\\end{{center}}
+		
+		\\vspace{{1cm}}
+		
+		\\restituegroupe{{CN}}
+		\\AMCassociation{{\\id}}
+		\\AMCaddpagesto{{4}}
+	    }}
+    }}
+
+\\begin{{document}}
+	\\AMCrandomseed{{1237893}}
+	\\def\\AMCformQuestion#1{{{{\\sc Question #1 :}}}}
+	\\setdefaultgroupmode{{withoutreplacement}}
+
+    """
     
     def _generate_question_latex_french(self, question):
-        """Génère le LaTeX pour une question selon le format français"""
+    
         question_id = question.get('id', 'q1')
         question_text = question['text']
         choices = question['choices']
-        
+    
         latex = f"""% {question.get('comment', 'Question générée')}
-\\element{{CN}}{{
-	\\begin{{question}}{{{question_id}}}\\scoring{{b=1,m=-.5,p=-0.5}}
-		{question_text}
-		\\begin{{reponseshoriz}}
-"""
-        
+    \\element{{CN}}{{
+	    \\begin{{question}}{{{question_id}}}\\scoring{{b=1,m=-.5,p=-0.5}}
+		    {question_text}
+		    \\begin{{reponseshoriz}}
+    """
+    
         for choice in choices:
             if choice.get('correct', False):
                 latex += f"\t\t\t\\bonne{{{choice['text']}}}\n"
             else:
                 latex += f"\t\t\t\\mauvaise{{{choice['text']}}}\n"
-        
+    
         latex += "\t\t\\end{reponseshoriz}\n\t\\end{question}\n}\n\n"
         return latex
     
-    def _generate_latex_footer_french(self, csv_filename):
-        """Génère le pied de page LaTeX selon le format français"""
-        return f"""
+    def _generate_latex_footer_french(self, csv_filename=None):
+    
+    
+    # Si pas de CSV, on génère une seule copie simple
+        if csv_filename is None or not os.path.exists(self.project_path / csv_filename):
+            return f"""
+%% GÉNÉRATION D'UNE COPIE SIMPLE %%
+\\sujet
+
+\\end{{document}}
+    """
+        else:
+        # Version avec CSV
+            return f"""
 %% GÉNÉRATION DES COPIES AVEC CSV %%
 \\csvreader[head to column names]{{{csv_filename}}}{{}}{{\\sujet}}
 
 \\end{{document}}
-"""
+    """
     
     def create_student_list_csv(self, students_data=None, csv_filename="liste.csv"):
         """Crée le fichier CSV des étudiants"""
@@ -187,50 +277,205 @@ class AMCManager:
         self.logger.info(f"Fichier CSV créé: {csv_file}")
         return csv_file
     
-    def create_complete_questionnaire(self, questions_data, students_data=None, 
-                                    title="QCM", subject="", duration="60 minutes",
-                                    csv_filename="liste.csv"):
-        """Crée un questionnaire complet avec fichier LaTeX et CSV"""
-        
-        # Créer le fichier CSV des étudiants
-        self.create_student_list_csv(students_data, csv_filename)
-        
-        # Créer le fichier LaTeX
+    def create_complete_questionnaire(self, questions_data, students_data=None, title="QCM", subject="", duration="60 minutes", csv_filename="liste.csv"):
+    
+    
+        print(f"=== Création questionnaire dans {self.project_path} ===")
+        print(f"Nombre de questions: {len(questions_data)}")
+        print(f"Titre: {title}")
+    
+    # Créer le fichier CSV seulement si des données étudiants sont fournies
+        csv_file_created = False
+        if students_data is not None and len(students_data) > 0:
+            print("Création du fichier CSV des étudiants...")
+            self.create_student_list_csv(students_data, csv_filename)
+            csv_file_created = True
+        else:
+            print("Pas de données étudiants - pas de CSV créé")
+            csv_filename = None
+    
+    # Créer le fichier LaTeX
+        print("Création du fichier LaTeX...")
         latex_file = self.create_latex_template(
             questions_data, title, subject, duration, csv_filename=csv_filename
         )
+    
+        print(f"Fichier LaTeX créé: {latex_file}")
+    
+    # Vérifier que le fichier a bien été créé
+        if latex_file.exists():
+            file_size = latex_file.stat().st_size
+            print(f"Fichier vérifié - Taille: {file_size} bytes")
         
+        # Lire et afficher un extrait pour debug
+            with open(latex_file, 'r', encoding='utf-8') as f:
+                content = f.read(300)
+                print(f"Début du contenu:\n{content[:300]}...")
+        else:
+            print("ERREUR: Le fichier LaTeX n'a pas été créé!")
+            raise Exception(f"Le fichier LaTeX n'a pas pu être créé: {latex_file}")
+    
         return latex_file
+
+    def create_latex_template(self, questions_data, title="QCM", subject="", duration="60 minutes", 
+                        instructions=None, csv_filename=None):
+    
+    
+            print(f"Création template LaTeX avec {len(questions_data)} questions")
+    
+            if instructions is None:
+                instructions = ("Vous ne devez cocher qu'une seule case. 1 point par bonne réponse. "
+                            "-0.5 point par mauvaise réponse ou si plusieurs cases sont cochées. "
+                            "0 point si aucune case n'est cochée pour la même question.")
+    
+            latex_content = self._generate_latex_header_french(title, subject, duration, instructions, csv_filename)
+    
+    # Générer les questions selon le format français
+            print("Génération des questions...")
+            for i, question in enumerate(questions_data):
+                print(f"  Question {i+1}: {question.get('text', '')[:50]}...")
+                latex_content += self._generate_question_latex_french(question)
+    
+            latex_content += self._generate_latex_footer_french(csv_filename)
+    
+    # Sauvegarder le fichier
+            latex_file = self.project_path / 'questionnaire.tex'
+            print(f"Sauvegarde dans: {latex_file}")
+    
+            try:
+                with open(latex_file, 'w', encoding='utf-8') as f:
+                    f.write(latex_content)
+                print("Fichier LaTeX sauvegardé avec succès")
+            except Exception as e:
+                print(f"ERREUR sauvegarde: {e}")
+                raise
+    
+            return latex_file
     
     def prepare_project(self, latex_file=None):
-        """Prépare le projet AMC (compilation LaTeX)"""
+    
         if latex_file is None:
             latex_file = self.project_path / 'questionnaire.tex'
-        
+    
         if not latex_file.exists():
             return {
                 'success': False,
                 'error': f'Fichier LaTeX non trouvé: {latex_file}'
             }
-        
-        # Nettoyer les anciens fichiers
-        for ext in ['*.pdf', '*.aux', '*.log']:
+    
+        self.logger.info(f"Préparation du projet avec le fichier: {latex_file}")
+    
+    # Nettoyer les anciens fichiers de compilation
+        extensions_to_clean = ['*.pdf', '*.aux', '*.log', '*.fls', '*.fdb_latexmk', '*.out']
+        for ext in extensions_to_clean:
             for file in self.project_path.glob(ext):
-                file.unlink()
-        
-        # Préparer les sujets avec la même commande que dans le script original
-        cmd = f"auto-multiple-choice prepare --with pdflatex --filter latex --data {self.data_path} {latex_file}"
+                try:
+                    file.unlink()
+                    self.logger.info(f"Fichier nettoyé: {file}")
+                except OSError as e:
+                    self.logger.warning(f"Impossible de nettoyer {file}: {e}")
+    
+    # Vérifier que le répertoire data existe
+        self.data_path.mkdir(parents=True, exist_ok=True)
+    
+    # Convertir en chemins absolus pour éviter les problèmes
+        abs_latex_file = latex_file.resolve()
+        abs_data_path = self.data_path.resolve()
+    
+    # Préparer les sujets avec la commande AMC (avec chemins absolus)
+        cmd = f"auto-multiple-choice prepare --with pdflatex --filter latex --data '{abs_data_path}' '{abs_latex_file}'"
+        self.logger.info(f"Exécution de la commande: {cmd}")
+    
         result = self.run_command(cmd)
-        
+    
         if result['success']:
-            # Copier le PDF généré
-            amc_pdf = self.project_path / 'amc-compiled.pdf'
-            output_pdf = self.project_path / 'questionnaire_output.pdf'
-            if amc_pdf.exists():
-                shutil.copy2(amc_pdf, output_pdf)
-                self.logger.info(f"PDF généré: {output_pdf}")
+            self.logger.info("Compilation AMC réussie")
         
+        # Chercher le PDF généré par AMC
+            possible_pdf_names = [
+                'amc-compiled.pdf',
+                f'{latex_file.stem}.pdf',
+                'questionnaire.pdf'
+            ]
+        
+            pdf_found = False
+            for pdf_name in possible_pdf_names:
+                amc_pdf = self.project_path / pdf_name
+                if amc_pdf.exists() and amc_pdf.stat().st_size > 1000:
+                # Copier vers un nom standardisé
+                    output_pdf = self.project_path / 'questionnaire_output.pdf'
+                    try:
+                        import shutil
+                        shutil.copy2(amc_pdf, output_pdf)
+                        self.logger.info(f"PDF copié: {amc_pdf} -> {output_pdf}")
+                        pdf_found = True
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Erreur copie PDF: {e}")
+        
+            if not pdf_found:
+                self.logger.warning("Aucun PDF valide trouvé après compilation")
+            # Essayer une compilation directe avec pdflatex
+                return self._fallback_pdflatex_compilation(latex_file)
+        else:
+            self.logger.error(f"Échec compilation AMC: {result.get('stderr', 'Erreur inconnue')}")
+        # Essayer une compilation directe avec pdflatex
+            return self._fallback_pdflatex_compilation(latex_file)
+    
         return result
+    
+    def _fallback_pdflatex_compilation(self, latex_file):
+    
+        self.logger.info("Tentative de compilation directe avec pdflatex...")
+    
+    # Convertir en chemin absolu
+        abs_latex_file = latex_file.resolve()
+        abs_project_path = self.project_path.resolve()
+    
+    # Commande pdflatex directe avec chemins absolus
+        cmd = f"pdflatex -interaction=nonstopmode -output-directory '{abs_project_path}' '{abs_latex_file}'"
+        self.logger.info(f"Commande pdflatex: {cmd}")
+    
+        result = self.run_command(cmd)
+    
+    # IMPORTANT: Vérifier d'abord si le PDF existe, même en cas d'erreur LaTeX
+        pdf_output = self.project_path / f"{latex_file.stem}.pdf"
+        if pdf_output.exists() and pdf_output.stat().st_size > 1000:
+        # PDF créé avec succès malgré les warnings/erreurs LaTeX
+            standard_pdf = self.project_path / 'questionnaire_output.pdf'
+            try:
+                import shutil
+                shutil.copy2(pdf_output, standard_pdf)
+                self.logger.info(f"PDF de secours créé avec succès: {standard_pdf}")
+                self.logger.info(f"Taille du PDF: {pdf_output.stat().st_size} bytes")
+            
+            # Succès même si LaTeX a retourné des warnings
+                return {
+                    'success': True,
+                    'stdout': result['stdout'],
+                    'stderr': result['stderr'],
+                    'method': 'pdflatex_fallback',
+                    'pdf_size': pdf_output.stat().st_size,
+                    'warnings': 'PDF créé avec des warnings LaTeX (normal)'
+                }
+            except Exception as e:
+                self.logger.error(f"Erreur copie PDF de secours: {e}")
+    
+    # Si vraiment aucun PDF n'a été créé
+        if result['success']:
+            return {
+                'success': False,
+                'error': 'PDF non généré malgré une compilation réussie',
+                'stdout': result.get('stdout', ''),
+                'stderr': result.get('stderr', ''),
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'Échec de compilation LaTeX (AMC et pdflatex)',
+                'stdout': result.get('stdout', ''),
+                'stderr': result.get('stderr', ''),
+            }
     
     def analyse_papers(self, scan_path=None, threshold=0.5):
         """Analyse les copies scannées"""

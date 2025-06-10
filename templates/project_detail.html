@@ -16,7 +16,9 @@
 <!-- Zone d'upload -->
 <div class="card">
     <h2>📤 Upload des copies</h2>
-    <div class="upload-zone" style="border: 2px dashed #667eea; border-radius: 15px; padding: 3rem; text-align: center; background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%); cursor: pointer;" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-zone"
+        style="border: 2px dashed #667eea; border-radius: 15px; padding: 3rem; text-align: center; background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%); cursor: pointer;"
+        onclick="document.getElementById('fileInput').click()">
         <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.7;">📁</div>
         <h3>Glissez vos fichiers ici ou cliquez pour sélectionner</h3>
         <p style="color: #666; font-size: 0.9rem; margin: 1rem 0;">PDF, PNG, JPG, JPEG • Max 50MB par fichier</p>
@@ -25,12 +27,13 @@
             📂 Choisir les fichiers
         </button>
     </div>
-    
-    <div id="uploadProgress" style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+
+    <div id="uploadProgress"
+        style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
         <h4>Upload en cours...</h4>
         <div id="progressContainer"></div>
     </div>
-    
+
     <div id="filesList" style="margin-top: 2rem;">
         <h4>📋 Fichiers uploadés</h4>
         <div id="filesContainer"></div>
@@ -43,14 +46,15 @@
 <!-- Actions de traitement -->
 <div class="card">
     <h2>⚙️ Configuration et Traitement</h2>
-    
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
         <a href="{{ url_for('configure_project', project_id=project_id) }}" class="btn btn-secondary">
             📝 Configurer le QCM
         </a>
-	 <a href="{{ url_for('download_qcm', project_id=project_id) }}" class="btn btn-secondary">
-        📄 Télécharger le QCM
-    	</a>  
+        <a href="{{ url_for('download_qcm', project_id=project_id) }}" class="btn btn-secondary">
+            📄 Télécharger le QCM
+        </a>
         <button onclick="processProject()" class="btn" {% if not uploaded_files %}disabled{% endif %}>
             🚀 Lancer le traitement
         </button>
@@ -60,14 +64,17 @@
         <button onclick="exportResults()" class="btn btn-secondary">
             📥 Exporter les notes
         </button>
+        <a href="{{ url_for('manage_students', project_id=project_id) }}" class="btn btn-secondary">
+            👥 Gérer les élèves
+        </a>
     </div>
-    
+
     {% if not uploaded_files %}
     <div style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 5px; margin-top: 1rem;">
         ⚠️ Vous devez d'abord uploader des copies avant de lancer le traitement
     </div>
     {% endif %}
-    
+
     <!-- Informations sur le QCM configuré -->
     <div id="qcmInfo" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-top: 1rem; display: none;">
         <h4>📋 Configuration actuelle :</h4>
@@ -94,96 +101,96 @@
 
 {% block scripts %}
 <script>
-const projectId = '{{ project_id }}';
+    const projectId = '{{ project_id }}';
 
-// Configuration du drag & drop
-document.addEventListener('DOMContentLoaded', function() {
-    const uploadArea = document.getElementById('uploadArea');
-   // setupDragDrop(uploadArea);
-});
-
-function handleFileSelect(files) {
-    if (files.length === 0) return;
-    
-    for (let file of files) {
-        uploadFile(file);
-    }
-}
-
-function uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const progressDiv = document.getElementById('uploadProgress');
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    
-    progressDiv.style.display = 'block';
-    progressText.textContent = `Upload de ${file.name}...`;
-    
-    fetch(`/upload/${projectId}`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            progressBar.style.width = '100%';
-            progressText.textContent = 'Upload terminé!';
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        } else {
-            alert('Erreur: ' + data.error);
-            progressDiv.style.display = 'none';
-        }
-    })
-    .catch(error => {
-        alert('Erreur lors de l\'upload: ' + error);
-        progressDiv.style.display = 'none';
+    // Configuration du drag & drop
+    document.addEventListener('DOMContentLoaded', function () {
+        const uploadArea = document.getElementById('uploadArea');
+        // setupDragDrop(uploadArea);
     });
-}
 
-function removeFile(filename) {
-    if (confirm(`Supprimer le fichier ${filename} ?`)) {
-        // Ici vous pourriez ajouter une route de suppression de fichier
-        alert('Fonctionnalité de suppression à implémenter');
-    }
-}
+    function handleFileSelect(files) {
+        if (files.length === 0) return;
 
-function processProject() {
-    if (!confirm('Lancer le traitement AMC ? Cela peut prendre plusieurs minutes.')) {
-        return;
-    }
-    
-    showLoading();
-    
-    fetch(`/process/${projectId}`)
-    .then(response => response.json())
-    .then(data => {
-        hideLoading();
-        
-        if (data.success) {
-            alert('Traitement terminé avec succès!');
-            showResults(data.results);
-        } else {
-            alert('Erreur lors du traitement: ' + data.error);
+        for (let file of files) {
+            uploadFile(file);
         }
-    })
-    .catch(error => {
-        hideLoading();
-        alert('Erreur: ' + error);
-    });
-}
+    }
 
-function showResults(results) {
-    const resultsArea = document.getElementById('resultsArea');
-    const resultsContent = document.getElementById('resultsContent');
-    
-    let html = '<h3>Résultats du traitement:</h3>';
-    
-    results.forEach((result, index) => {
-        html += `
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const progressDiv = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
+        progressDiv.style.display = 'block';
+        progressText.textContent = `Upload de ${file.name}...`;
+
+        fetch(`/upload/${projectId}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    progressBar.style.width = '100%';
+                    progressText.textContent = 'Upload terminé!';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    alert('Erreur: ' + data.error);
+                    progressDiv.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                alert('Erreur lors de l\'upload: ' + error);
+                progressDiv.style.display = 'none';
+            });
+    }
+
+    function removeFile(filename) {
+        if (confirm(`Supprimer le fichier ${filename} ?`)) {
+            // Ici vous pourriez ajouter une route de suppression de fichier
+            alert('Fonctionnalité de suppression à implémenter');
+        }
+    }
+
+    function processProject() {
+        if (!confirm('Lancer le traitement AMC ? Cela peut prendre plusieurs minutes.')) {
+            return;
+        }
+
+        showLoading();
+
+        fetch(`/process/${projectId}`)
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+
+                if (data.success) {
+                    alert('Traitement terminé avec succès!');
+                    showResults(data.results);
+                } else {
+                    alert('Erreur lors du traitement: ' + data.error);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                alert('Erreur: ' + error);
+            });
+    }
+
+    function showResults(results) {
+        const resultsArea = document.getElementById('resultsArea');
+        const resultsContent = document.getElementById('resultsContent');
+
+        let html = '<h3>Résultats du traitement:</h3>';
+
+        results.forEach((result, index) => {
+            html += `
             <div style="margin-bottom: 1rem; padding: 1rem; background: ${result.success ? '#d4edda' : '#f8d7da'}; border-radius: 5px;">
                 <strong>Étape ${index + 1}:</strong> ${result.success ? '✅ Succès' : '❌ Erreur'}
                 <details style="margin-top: 0.5rem;">
@@ -192,83 +199,83 @@ function showResults(results) {
                 </details>
             </div>
         `;
-    });
-    
-    resultsContent.innerHTML = html;
-    resultsArea.style.display = 'block';
-}
+        });
 
-function viewResults() {
-    window.open(`/results/${projectId}`, '_blank');
-}
-
-function exportResults() {
-    // Ici vous pourriez ajouter l'export des résultats
-    alert('Fonctionnalité d\'export à implémenter');
-}
-
-// Upload simple fonctionnel
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const files = e.target.files;
-    if (files.length > 0) {
-        document.getElementById('uploadProgress').style.display = 'block';
-        Array.from(files).forEach(file => uploadFileSimple(file));
+        resultsContent.innerHTML = html;
+        resultsArea.style.display = 'block';
     }
-});
 
-function uploadFileSimple(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // Ajouter à la liste des uploads en cours
-    addProgressItem(file.name);
-    
-    fetch(`/upload/${projectId}`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            addFileToList(file.name);
-            updateProgressItem(file.name, true);
-        } else {
-            updateProgressItem(file.name, false, data.error);
+    function viewResults() {
+        window.open(`/results/${projectId}`, '_blank');
+    }
+
+    function exportResults() {
+        // Ici vous pourriez ajouter l'export des résultats
+        alert('Fonctionnalité d\'export à implémenter');
+    }
+
+    // Upload simple fonctionnel
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            document.getElementById('uploadProgress').style.display = 'block';
+            Array.from(files).forEach(file => uploadFileSimple(file));
         }
-    })
-    .catch(error => {
-        updateProgressItem(file.name, false, error.message);
     });
-}
 
-function addProgressItem(filename) {
-    const container = document.getElementById('progressContainer');
-    const div = document.createElement('div');
-    div.id = `progress-${filename}`;
-    div.style.cssText = 'margin-bottom: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px;';
-    div.innerHTML = `<span>📤 ${filename}</span> <span class="status">En cours...</span>`;
-    container.appendChild(div);
-}
+    function uploadFileSimple(file) {
+        const formData = new FormData();
+        formData.append('file', file);
 
-function updateProgressItem(filename, success, error = '') {
-    const item = document.getElementById(`progress-${filename}`);
-    if (item) {
-        const status = item.querySelector('.status');
-        if (success) {
-            status.innerHTML = '✅ Terminé';
-            status.style.color = '#28a745';
-        } else {
-            status.innerHTML = `❌ Erreur: ${error}`;
-            status.style.color = '#dc3545';
+        // Ajouter à la liste des uploads en cours
+        addProgressItem(file.name);
+
+        fetch(`/upload/${projectId}`, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addFileToList(file.name);
+                    updateProgressItem(file.name, true);
+                } else {
+                    updateProgressItem(file.name, false, data.error);
+                }
+            })
+            .catch(error => {
+                updateProgressItem(file.name, false, error.message);
+            });
+    }
+
+    function addProgressItem(filename) {
+        const container = document.getElementById('progressContainer');
+        const div = document.createElement('div');
+        div.id = `progress-${filename}`;
+        div.style.cssText = 'margin-bottom: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px;';
+        div.innerHTML = `<span>📤 ${filename}</span> <span class="status">En cours...</span>`;
+        container.appendChild(div);
+    }
+
+    function updateProgressItem(filename, success, error = '') {
+        const item = document.getElementById(`progress-${filename}`);
+        if (item) {
+            const status = item.querySelector('.status');
+            if (success) {
+                status.innerHTML = '✅ Terminé';
+                status.style.color = '#28a745';
+            } else {
+                status.innerHTML = `❌ Erreur: ${error}`;
+                status.style.color = '#dc3545';
+            }
         }
     }
-}
 
-function addFileToList(filename) {
-    const container = document.getElementById('filesContainer');
-    const div = document.createElement('div');
-    div.style.cssText = 'padding: 1rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #28a745;';
-    div.innerHTML = `
+    function addFileToList(filename) {
+        const container = document.getElementById('filesContainer');
+        const div = document.createElement('div');
+        div.style.cssText = 'padding: 1rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #28a745;';
+        div.innerHTML = `
         <div>
             <span>📄</span>
             <strong>${filename}</strong>
@@ -276,28 +283,28 @@ function addFileToList(filename) {
         </div>
         <button class="btn btn-danger" onclick="deleteFileSimple('${filename}')" style="padding: 8px 16px;">🗑️ Supprimer</button>
     `;
-    container.appendChild(div);
-}
-
-function deleteFileSimple(filename) {
-    if (confirm(`Supprimer ${filename} ?`)) {
-        fetch(`/delete/${projectId}/${filename}`, { method: 'DELETE' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Erreur: ' + data.error);
-            }
-        });
+        container.appendChild(div);
     }
-}
 
-// Charger les fichiers existants
-fetch(`/api/project/${projectId}/files`)
-.then(response => response.json())
-.then(files => {
-    files.forEach(filename => addFileToList(filename));
-});
+    function deleteFileSimple(filename) {
+        if (confirm(`Supprimer ${filename} ?`)) {
+            fetch(`/delete/${projectId}/${filename}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Erreur: ' + data.error);
+                    }
+                });
+        }
+    }
+
+    // Charger les fichiers existants
+    fetch(`/api/project/${projectId}/files`)
+        .then(response => response.json())
+        .then(files => {
+            files.forEach(filename => addFileToList(filename));
+        });
 </script>
 {% endblock %}

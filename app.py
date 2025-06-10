@@ -70,25 +70,26 @@ def download_qcm(project_id):
         # Utiliser AMCManager pour générer le PDF
         amc = AMCManager(project_path)
         
-        # Vérifier s'il y a un fichier LaTeX
+        # Vérifier s'il y a un fichier LaTeX, sinon le créer
         latex_file = os.path.join(project_path, 'questionnaire.tex')
         if not os.path.exists(latex_file):
             # Créer un QCM de base s'il n'existe pas
             config_file = os.path.join(project_path, 'qcm_config.json')
             if os.path.exists(config_file):
-                with open(config_file, 'r') as f:
-                    questions_data = json.load(f)
-                    # Adapter le format si nécessaire
-                    formatted_questions = []
-                    for i, q in enumerate(questions_data):
-                        formatted_q = {
-                            'id': f'q{i+1}',
-                            'text': q.get('text', ''),
-                            'choices': q.get('choices', []),
-                            'comment': f'Question {i+1}'
-                        }
-                        formatted_questions.append(formatted_q)
-                    amc.create_complete_questionnaire(formatted_questions)
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                    questions_data = config_data.get('questions', [])
+                    title = config_data.get('title', 'QCM')
+                    subject = config_data.get('subject', '')
+                    duration = config_data.get('duration', '60 minutes')
+                    
+                    # Créer le questionnaire avec la configuration
+                    amc.create_complete_questionnaire(
+                        questions_data, 
+                        title=title, 
+                        subject=subject, 
+                        duration=duration
+                    )
             else:
                 # Utiliser les questions d'exemple
                 formatted_sample = []
@@ -102,18 +103,42 @@ def download_qcm(project_id):
                     formatted_sample.append(formatted_q)
                 amc.create_complete_questionnaire(formatted_sample)
         
+        # Nettoyer les anciens PDFs pour forcer la régénération
+        pdf_files_to_clean = [
+            'amc-compiled.pdf',
+            'questionnaire_output.pdf', 
+            'questionnaire.pdf'
+        ]
+        
+        for pdf_file in pdf_files_to_clean:
+            pdf_path = os.path.join(project_path, pdf_file)
+            if os.path.exists(pdf_path):
+                try:
+                    os.remove(pdf_path)
+                    print(f"Ancien PDF supprimé: {pdf_path}")
+                except OSError as e:
+                    print(f"Impossible de supprimer {pdf_path}: {e}")
+        
         # Préparer le projet (compilation LaTeX vers PDF)
+        print(f"Compilation du projet dans: {project_path}")
         result = amc.prepare_project()
         
+        # Affichage des détails du résultat pour debug
+        print(f"Résultat compilation: {result}")
+        
         if not result['success']:
-            flash(f'Erreur compilation LaTeX: {result.get("stderr", "Erreur inconnue")}', 'error')
+            error_msg = result.get('stderr', result.get('error', 'Erreur inconnue'))
+            print(f"Erreur compilation LaTeX: {error_msg}")
+            flash(f'Erreur compilation LaTeX: {error_msg}', 'error')
+            
             # En cas d'échec, proposer le téléchargement du LaTeX
             if os.path.exists(latex_file):
                 return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
             else:
+                flash('Aucun fichier à télécharger', 'error')
                 return redirect(url_for('project_detail', project_id=project_id))
         
-        # Chercher le PDF généré
+        # Chercher le PDF généré (avec plus de vérifications)
         possible_pdf_paths = [
             os.path.join(project_path, 'amc-compiled.pdf'),
             os.path.join(project_path, 'questionnaire_output.pdf'),
@@ -122,28 +147,47 @@ def download_qcm(project_id):
         
         pdf_file = None
         for pdf_path in possible_pdf_paths:
-            if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 1000:  # Vérifier que le fichier n'est pas vide
-                pdf_file = pdf_path
-                break
+            print(f"Vérification du PDF: {pdf_path}")
+            if os.path.exists(pdf_path):
+                file_size = os.path.getsize(pdf_path)
+                print(f"Taille du fichier: {file_size} bytes")
+                
+                if file_size > 1000:  # Vérifier que le fichier n'est pas vide/corrompu
+                    pdf_file = pdf_path
+                    print(f"PDF trouvé et valide: {pdf_path}")
+                    break
+                else:
+                    print(f"PDF trop petit, probablement corrompu: {pdf_path}")
         
         if pdf_file:
             # Créer un nom de fichier plus descriptif
-            with open(os.path.join(project_path, 'project_info.json'), 'r') as f:
-                project_info = json.load(f)
-                project_name = project_info.get('name', 'qcm')
+            try:
+                with open(os.path.join(project_path, 'project_info.json'), 'r', encoding='utf-8') as f:
+                    project_info = json.load(f)
+                    project_name = project_info.get('name', 'qcm')
+            except:
+                project_name = 'qcm'
             
-            download_name = f"{project_name}_{project_id}.pdf"
+            # Nettoyer le nom pour éviter les caractères problématiques
+            safe_project_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            download_name = f"{safe_project_name}_{project_id}.pdf"
+            
+            print(f"Téléchargement du PDF: {pdf_file} -> {download_name}")
             return send_file(pdf_file, as_attachment=True, download_name=download_name)
         else:
-            flash('PDF non généré ou vide', 'error')
-            # Fallback vers le LaTeX
+            print("Aucun PDF valide trouvé")
+            flash('PDF non généré ou corrompu', 'error')
+            
+            # Fallback vers le LaTeX si disponible
             if os.path.exists(latex_file):
+                flash('Téléchargement du fichier LaTeX à la place', 'warning')
                 return send_file(latex_file, as_attachment=True, download_name=f'qcm_{project_id}.tex')
             else:
                 flash('Aucun fichier à télécharger', 'error')
                 return redirect(url_for('project_detail', project_id=project_id))
             
     except Exception as e:
+        print(f"Exception dans download_qcm: {str(e)}")
         flash(f'Erreur: {str(e)}', 'error')
         return redirect(url_for('project_detail', project_id=project_id))
 
@@ -536,6 +580,96 @@ def delete_file(project_id, filename):
             return jsonify({'success': False, 'error': 'Fichier non trouvé'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/students/<project_id>', methods=['GET', 'POST'])
+def manage_students(project_id):
+    """Gérer la liste des élèves avec leurs codes"""
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    info_file = os.path.join(project_path, 'project_info.json')
+    
+    if not os.path.exists(info_file):
+        flash('Projet non trouvé', 'error')
+        return redirect(url_for('list_projects'))
+    
+    with open(info_file, 'r') as f:
+        project_info = json.load(f)
+    
+    if request.method == 'POST':
+        # Traiter l'ajout/modification des élèves
+        students_data = []
+        
+        # Récupérer le nombre d'élèves
+        student_count = int(request.form.get('student_count', 0))
+        
+        for i in range(student_count):
+            nom = request.form.get(f'student_{i}_nom', '').strip()
+            prenom = request.form.get(f'student_{i}_prenom', '').strip()
+            code = request.form.get(f'student_{i}_code', '').strip()
+            
+            if nom and prenom:  # Au minimum nom et prénom requis
+                student = {
+                    'id': code if code else str(i+1).zfill(3),  # Code ou numéro auto
+                    'nom': nom,
+                    'prenom': prenom,
+                    'code': code if code else str(i+1).zfill(3)
+                }
+                students_data.append(student)
+        
+        # Sauvegarder la liste des élèves
+        students_file = os.path.join(project_path, 'students.json')
+        with open(students_file, 'w', encoding='utf-8') as f:
+            json.dump(students_data, f, indent=2, ensure_ascii=False)
+        
+        # Créer le CSV AMC
+        if students_data:
+            amc = AMCManager(project_path)
+            amc.create_student_list_csv(students_data)
+            flash(f'{len(students_data)} élèves ajoutés avec succès!', 'success')
+        else:
+            flash('Aucun élève valide ajouté', 'warning')
+        
+        return redirect(url_for('manage_students', project_id=project_id))
+    
+    # Charger la liste existante
+    students_file = os.path.join(project_path, 'students.json')
+    existing_students = []
+    if os.path.exists(students_file):
+        with open(students_file, 'r', encoding='utf-8') as f:
+            existing_students = json.load(f)
+    
+    return render_template('manage_students.html', 
+                         project=project_info,
+                         project_id=project_id,
+                         students=existing_students)
+
+# Fonction améliorée pour créer le CSV avec codes
+def create_student_list_csv(self, students_data=None, csv_filename="liste.csv"):
+    """Crée le fichier CSV des étudiants avec codes"""
+    csv_file = self.project_path / csv_filename
+    
+    if students_data is None:
+        # CSV par défaut avec codes séquentiels
+        students_data = [
+            {'id': '001', 'nom': 'EXEMPLE', 'prenom': 'Eleve', 'code': '001'}
+        ]
+    
+    # Écrire le CSV avec les bonnes colonnes pour AMC
+    with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+        fieldnames = ['id', 'nom', 'prenom', 'code']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for student in students_data:
+            # S'assurer que tous les champs sont présents
+            student_row = {
+                'id': student.get('id', student.get('code', '001')),
+                'nom': student.get('nom', ''),
+                'prenom': student.get('prenom', ''),
+                'code': student.get('code', student.get('id', '001'))
+            }
+            writer.writerow(student_row)
+    
+    self.logger.info(f"Fichier CSV créé avec {len(students_data)} élèves: {csv_file}")
+    return csv_file
 
 @app.route('/help')
 def help_page():
