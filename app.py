@@ -20,7 +20,7 @@ AMC_PROJECTS_FOLDER = 'amc-projects'
 RESULTS_FOLDER = 'results'
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
-# Créer les dossiers nécessaires
+# Créér les dossiers nécessaires
 for folder in [UPLOAD_FOLDER, AMC_PROJECTS_FOLDER, RESULTS_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
