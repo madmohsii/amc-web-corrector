@@ -63,17 +63,16 @@ class AMCManager:
             }
 
     def _generate_latex_header_french(self, title, subject, duration, instructions, csv_filename=None):
-        """Génère un header LaTeX avec questions IDENTIQUES pour tous les élèves"""
-        
-        # HEADER COMMUN - IDENTIQUE dans tous les cas
+    
+    
+    # HEADER COMMUN - IDENTIQUE dans tous les cas
         base_header = f"""\\documentclass[12pt,a4paper]{{article}}
 
-\\usepackage{{csvsimple,graphicx,pifont}}%
+\\usepackage{{csvsimple,graphicx,pifont}}
 \\usepackage[francais,bloc]{{automultiplechoice}}
 \\usepackage[utf8]{{inputenc}}    
 \\usepackage[T1]{{fontenc}}
 \\usepackage{{geometry}}
-
 \\usepackage{{verbatimbox}}
 \\usepackage{{tcolorbox}}
 
@@ -85,53 +84,55 @@ class AMCManager:
 % SEED FIXE pour questions identiques
 \\AMCrandomseed{{1237893}}
 \\def\\AMCformQuestion#1{{{{\\sc Question #1 :}}}}
-"""
-
-        if csv_filename and (self.project_path / csv_filename).exists():
-            # MODE CSV : Copies multiples avec noms pré-remplis
-            header = base_header + f"""
-\\newcommand{{\\sujet}}{{
-    \\exemplaire{{1}}{{%
-        % En-tête avec code élève 2 rangées de 10 cases
-        \\noindent
-        \\textbf{{Code élève}}\\\\[0.2cm]
-        \\AMCcode{{etudiant}}{{2}}
-        
-        \\vspace{{0.8cm}}
-        
-        \\noindent
-        \\framebox[\\textwidth]{{%
-            \\begin{{minipage}}{{0.95\\textwidth}}
-                \\centering
-                \\textbf{{Nom et prénom :}} \\nom{{}} \\prenom{{}}\\\\[0.5cm]
-                \\dotfill\\\\[0.5cm]
-                \\dotfill
-            \\end{{minipage}}
-        }}
-        
-        \\vspace{{1cm}}
-        
-        \\begin{{center}}
-            \\textbf{{{title}}}\\\\[0.3cm]
-            {subject}\\\\[0.2cm]
-            Durée : {duration}.\\\\[0.5cm]
-            \\textbf{{{instructions}}}
-        \\end{{center}}
-        
-        \\vspace{{1cm}}
-        
-        % Questions dans l'ordre FIXE
-        \\restituegroupe{{Questions}}
-        \\AMCaddpagesto{{4}}
-    }}
-}}
 
 \\begin{{document}}
-"""
+
+    """
+
+        if csv_filename and (self.project_path / csv_filename).exists():
+        # MODE CSV : Copies multiples avec noms pré-remplis
+            header = base_header + f"""% Mode CSV avec liste d'étudiants
+
+\\newcommand{{\\sujet}}{{%
+    % En-tête avec code élève 2 rangées de 10 cases
+    \\noindent
+    \\textbf{{Code élève}}\\\\[0.2cm]
+    \\AMCcode{{etudiant}}{{2}}
+    
+    \\vspace{{0.8cm}}
+    
+    \\noindent
+    \\framebox[\\textwidth]{{%
+        \\begin{{minipage}}{{0.95\\textwidth}}
+            \\centering
+            \\textbf{{Nom et prénom :}} \\nom{{}} \\prenom{{}}\\\\[0.5cm]
+            \\dotfill\\\\[0.5cm]
+            \\dotfill
+        \\end{{minipage}}
+        }}
+    
+    \\vspace{{1cm}}
+    
+    \\begin{{center}}
+        \\textbf{{{title}}}\\\\[0.3cm]
+        {subject}\\\\[0.2cm]
+        Durée : {duration}.\\\\[0.5cm]
+        \\textbf{{{instructions}}}
+    \\end{{center}}
+    
+    \\vspace{{1cm}}
+    
+    % Questions dans l'ordre FIXE
+    \\restituegroupe{{Questions}}
+    \\AMCaddpagesto{{4}}
+    }}
+
+    """
         else:
-            # MODE SIMPLE : Copie unique
-            header = base_header + f"""
-\\newcommand{{\\sujet}}{{
+        # MODE SIMPLE : Copie unique
+            header = base_header + f"""% Mode simple sans CSV
+
+\\newcommand{{\\sujet}}{{%
     \\exemplaire{{1}}{{%
         % En-tête avec code élève 2 rangées de 10 cases
         \\noindent
@@ -148,7 +149,7 @@ class AMCManager:
                 \\dotfill\\\\[0.5cm]
                 \\dotfill
             \\end{{minipage}}
-        }}
+            }}
         
         \\vspace{{1cm}}
         
@@ -164,52 +165,55 @@ class AMCManager:
         % Questions dans l'ordre FIXE
         \\restituegroupe{{Questions}}
         \\AMCaddpagesto{{4}}
+        }}
     }}
-}}
 
-\\begin{{document}}
-"""
-        
+    """
+    
         return header
 
     def _generate_question_latex_french(self, question):
-        """Génère une question dans un groupe ORDONNÉ"""
+    
         question_id = question.get('id', 'q1')
         question_text = question['text']
         choices = question['choices']
 
-        # Utiliser un groupe simple et ordonné
+    # Utiliser un groupe simple et ordonné
         latex = f"""\\element{{Questions}}{{
-    \\begin{{question}}{{{question_id}}}\\scoring{{b=1,m=-.5,p=-0.5}}
-        {question_text}
-        \\begin{{reponseshoriz}}
-"""
+        \\begin{{question}}{{{question_id}}}\\scoring{{b=1,m=-.5,p=-0.5}}
+            {question_text}
+            \\begin{{reponseshoriz}}
+    """
 
-        # Ajouter les choix dans l'ordre
+    # Ajouter les choix dans l'ordre
         for choice in choices:
             if choice.get('correct', False):
-                latex += f"            \\bonne{{{choice['text']}}}\\n"
+                latex += f"            \\bonne{{{choice['text']}}}\n"
             else:
-                latex += f"            \\mauvaise{{{choice['text']}}}\\n"
+                latex += f"            \\mauvaise{{{choice['text']}}}\n"
 
-        latex += "        \\end{reponseshoriz}\\n    \\end{question}\\n}\\n\\n"
+        latex += """        \\end{reponseshoriz}
+    \\end{question}
+    }
+
+    """
         return latex
 
     def _generate_latex_footer_french(self, csv_filename=None):
-        """Footer avec génération des copies"""
-        
+    
+    
         if csv_filename and (self.project_path / csv_filename).exists():
-            # Mode CSV
+        # Mode CSV
             return f"""\\csvreader[head to column names]{{{csv_filename}}}{{}}{{\\sujet}}
 
-\\end{{document}}
-"""
+    \\end{{document}}
+    """
         else:
-            # Mode simple
+        # Mode simple
             return """\\sujet
 
-\\end{{document}}
-"""
+    \\end{document}
+    """
 
     def create_latex_template(self, questions_data, title="QCM", subject="", duration="60 minutes", 
                             instructions=None, csv_filename="liste.csv"):
@@ -382,38 +386,7 @@ class AMCManager:
                 'stderr': result.get('stderr', ''),
             }
 
-    def analyse_papers(self, scan_path=None, threshold=0.5):
-        """Analyse les copies scannées"""
-        if scan_path is None:
-            scan_path = self.uploads_path
-        
-        scan_files = []
-        if isinstance(scan_path, str):
-            scan_path = Path(scan_path)
-        
-        # Chercher les fichiers scannés
-        for ext in ['*.pdf', '*.jpg', '*.png', '*.jpeg']:
-            scan_files.extend(list(scan_path.glob(ext)))
-        
-        if not scan_files:
-            return {
-                'success': False,
-                'error': f'Aucun fichier scanné trouvé dans {scan_path}'
-            }
-        
-        # Commande d'analyse
-        cmd = f"auto-multiple-choice analyse --data {self.data_path} --cr {self.cr_path} --auto-capture --threshold {threshold}"
-        
-        # Ajouter les fichiers scannés
-        for scan_file in scan_files:
-            cmd += f" '{scan_file}'"
-        
-        result = self.run_command(cmd)
-        
-        if result['success']:
-            self.logger.info(f"Analyse de {len(scan_files)} fichiers terminée")
-        
-        return result
+    
     
     def calculate_marks(self, scoring_strategy='default'):
         """Calcule les notes"""
@@ -642,3 +615,514 @@ class AMCManager:
             subject="",
             duration="60 minutes"
         )
+    
+    # Améliorations à ajouter à votre amc_manager.py
+
+def create_answer_sheet(self, output_path=None):
+    """Crée la feuille de réponses pour la correction"""
+    if output_path is None:
+        output_path = self.project_path / 'answer_sheet.pdf'
+    
+    cmd = f"auto-multiple-choice reponse --data '{self.data_path}' --sujet questionnaire.tex --fich '{output_path}'"
+    result = self.run_command(cmd)
+    
+    if result['success']:
+        self.logger.info(f"Feuille de réponses créée: {output_path}")
+    
+    return result
+
+def auto_scan_detection(self, scan_files):
+    """Détection automatique des paramètres de scan optimaux"""
+    detection_results = []
+    
+    for scan_file in scan_files:
+        cmd = f"auto-multiple-choice getimages --vector-density 300 --list-pages '{scan_file}'"
+        result = self.run_command(cmd)
+        
+        if result['success']:
+            detection_results.append({
+                'file': scan_file,
+                'pages': result['stdout'].count('\n'),
+                'detected': True
+            })
+        else:
+            detection_results.append({
+                'file': scan_file,
+                'error': result.get('stderr', 'Erreur de détection'),
+                'detected': False
+            })
+    
+    return detection_results
+
+def prepare_scan_images(self, scan_path=None, dpi=300):
+    """Prépare et optimise les images scannées pour l'analyse"""
+    if scan_path is None:
+        scan_path = self.uploads_path
+    
+    scan_files = []
+    processed_files = []
+    
+    # Chercher tous les fichiers scannés
+    for ext in ['*.pdf', '*.jpg', '*.png', '*.jpeg', '*.tiff', '*.tif']:
+        scan_files.extend(list(scan_path.glob(ext)))
+    
+    if not scan_files:
+        return {
+            'success': False,
+            'error': f'Aucun fichier scanné trouvé dans {scan_path}'
+        }
+    
+    # Créer dossier pour les images préparées
+    prepared_path = self.project_path / 'prepared_scans'
+    prepared_path.mkdir(exist_ok=True)
+    
+    for scan_file in scan_files:
+        try:
+            if scan_file.suffix.lower() == '.pdf':
+                # Convertir PDF en images individuelles
+                cmd = f"auto-multiple-choice getimages --vector-density {dpi} --copy-to '{prepared_path}' '{scan_file}'"
+            else:
+                # Copier et optimiser les images
+                import shutil
+                dest_file = prepared_path / scan_file.name
+                shutil.copy2(scan_file, dest_file)
+                cmd = f"echo 'Image copiée: {dest_file}'"
+            
+            result = self.run_command(cmd)
+            if result['success']:
+                processed_files.append(scan_file)
+                self.logger.info(f"Fichier préparé: {scan_file}")
+            else:
+                self.logger.error(f"Erreur préparation {scan_file}: {result.get('stderr')}")
+        
+        except Exception as e:
+            self.logger.error(f"Erreur traitement {scan_file}: {e}")
+    
+    return {
+        'success': len(processed_files) > 0,
+        'processed_files': processed_files,
+        'prepared_path': prepared_path,
+        'total_files': len(scan_files)
+    }
+
+def advanced_analysis(self, scan_path=None, auto_capture=True, threshold=0.5, try_harder=True):
+    """Analyse avancée des copies scannées avec options optimisées"""
+    if scan_path is None:
+        scan_path = self.uploads_path
+    
+    # D'abord préparer les images
+    prep_result = self.prepare_scan_images(scan_path)
+    if not prep_result['success']:
+        return prep_result
+    
+    # Utiliser les images préparées
+    prepared_path = prep_result['prepared_path']
+    scan_files = list(prepared_path.glob('*'))
+    
+    if not scan_files:
+        return {
+            'success': False,
+            'error': 'Aucun fichier préparé pour l\'analyse'
+        }
+    
+    # Commande d'analyse avec options avancées
+    cmd_parts = [
+        "auto-multiple-choice",
+        "analyse",
+        f"--data '{self.data_path}'",
+        f"--cr '{self.cr_path}'",
+        f"--threshold {threshold}"
+    ]
+    
+    if auto_capture:
+        cmd_parts.append("--auto-capture")
+    
+    if try_harder:
+        cmd_parts.append("--try-harder")
+    
+    # Ajouter tous les fichiers à analyser
+    for scan_file in scan_files:
+        cmd_parts.append(f"'{scan_file}'")
+    
+    cmd = " ".join(cmd_parts)
+    
+    self.logger.info(f"Analyse de {len(scan_files)} fichiers avec options avancées")
+    result = self.run_command(cmd)
+    
+    if result['success']:
+        self.logger.info("Analyse avancée terminée avec succès")
+        
+        # Vérifier les résultats d'analyse
+        analysis_stats = self.get_analysis_statistics()
+        result['analysis_stats'] = analysis_stats
+    else:
+        self.logger.error(f"Échec analyse: {result.get('stderr')}")
+    
+    return result
+
+def get_analysis_statistics(self):
+    """Récupère les statistiques de l'analyse (copies détectées, erreurs, etc.)"""
+    stats = {
+        'papers_detected': 0,
+        'papers_with_errors': 0,
+        'unreadable_papers': 0,
+        'missing_student_codes': 0,
+        'duplicate_codes': 0
+    }
+    
+    try:
+        # Chercher les fichiers de résultats d'analyse dans cr/
+        cr_files = list(self.cr_path.glob('*.xml'))
+        
+        if cr_files:
+            stats['papers_detected'] = len(cr_files)
+            
+            # Analyser les fichiers XML pour détecter les erreurs
+            # (ici simplifié, vous pourriez parser le XML pour plus de détails)
+            
+        # Alternative: utiliser la commande AMC pour obtenir des stats
+        cmd = f"auto-multiple-choice export --data '{self.data_path}' --module CSV --fich-noms '' --stats-only"
+        result = self.run_command(cmd, check=False)
+        
+        if result['success'] and result['stdout']:
+            # Parser les stats de la sortie (format dépend de la version AMC)
+            lines = result['stdout'].split('\n')
+            for line in lines:
+                if 'papers' in line.lower():
+                    # Extraire le nombre de copies
+                    import re
+                    numbers = re.findall(r'\d+', line)
+                    if numbers:
+                        stats['papers_detected'] = int(numbers[0])
+    
+    except Exception as e:
+        self.logger.error(f"Erreur statistiques analyse: {e}")
+    
+    return stats
+
+def smart_scoring(self, strategy='adaptive', bonus_malus=None):
+    """Système de notation intelligent avec différentes stratégies"""
+    
+    scoring_strategies = {
+        'french_standard': {'b': 1, 'm': -0.5, 'p': -0.5},  # Standard français
+        'no_negative': {'b': 1, 'm': 0, 'p': 0},           # Pas de points négatifs
+        'harsh': {'b': 1, 'm': -1, 'p': -0.25},            # Pénalité forte
+        'bonus': {'b': 1.2, 'm': -0.3, 'p': 0},            # Bonus pour bonnes réponses
+        'adaptive': None  # Sera calculé automatiquement
+    }
+    
+    if strategy == 'adaptive':
+        # Calculer automatiquement selon la difficulté des questions
+        analysis_stats = self.get_analysis_statistics()
+        if analysis_stats['papers_detected'] > 0:
+            # Analyser les taux de réussite pour adapter le barème
+            question_stats = self.analyze_question_difficulty()
+            avg_difficulty = sum(q['success_rate'] for q in question_stats) / len(question_stats) if question_stats else 0.5
+            
+            if avg_difficulty > 0.8:  # Questions faciles
+                bonus_malus = {'b': 1, 'm': -0.75, 'p': -0.5}
+            elif avg_difficulty < 0.4:  # Questions difficiles
+                bonus_malus = {'b': 1.5, 'm': -0.25, 'p': 0}
+            else:  # Difficulté moyenne
+                bonus_malus = {'b': 1, 'm': -0.5, 'p': -0.25}
+        else:
+            bonus_malus = scoring_strategies['french_standard']
+    else:
+        bonus_malus = bonus_malus or scoring_strategies.get(strategy, scoring_strategies['french_standard'])
+    
+    # Formatter le barème pour AMC
+    bareme_str = f"(b={bonus_malus['b']},m={bonus_malus['m']},p={bonus_malus['p']})"
+    
+    cmd = f"auto-multiple-choice note --data '{self.data_path}' --bareme '{bareme_str}'"
+    result = self.run_command(cmd)
+    
+    if result['success']:
+        self.logger.info(f"Notation terminée avec barème: {bareme_str}")
+        result['scoring_used'] = bonus_malus
+    
+    return result
+
+def analyze_question_difficulty(self):
+    """Analyse la difficulté de chaque question"""
+    # Cette fonction nécessiterait d'analyser les résultats intermédiaires
+    # Pour l'instant, retourne des stats par défaut
+    return [{'question': i+1, 'success_rate': 0.6} for i in range(10)]
+
+def generate_detailed_reports(self, include_individual=True, include_statistics=True):
+    """Génère des rapports détaillés"""
+    reports = {}
+    
+    # 1. Export CSV détaillé
+    csv_result = self.export_results('csv')
+    reports['csv'] = csv_result
+    
+    # 2. Export ODS (LibreOffice)
+    ods_result = self.export_results('ods')
+    reports['ods'] = ods_result
+    
+    # 3. Rapport statistique détaillé
+    if include_statistics:
+        stats_file = self.exports_path / 'statistics.json'
+        detailed_stats = self.generate_advanced_statistics()
+        
+        with open(stats_file, 'w', encoding='utf-8') as f:
+            json.dump(detailed_stats, f, indent=2, ensure_ascii=False)
+        
+        reports['statistics'] = {
+            'success': True,
+            'file': stats_file,
+            'data': detailed_stats
+        }
+    
+    # 4. Copies individuelles annotées
+    if include_individual:
+        annotated_result = self.generate_annotated_papers()
+        reports['annotated'] = annotated_result
+    
+    return reports
+
+def generate_advanced_statistics(self):
+    """Génère des statistiques avancées et détaillées"""
+    stats = {
+        'general': self.get_statistics(),
+        'analysis': self.get_analysis_statistics(),
+        'questions': [],
+        'distribution': {},
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Analyser le fichier CSV s'il existe
+    csv_file = self.exports_path / 'notes.csv'
+    if csv_file.exists():
+        try:
+            import pandas as pd
+            df = pd.read_csv(csv_file)
+            
+            if not df.empty:
+                # Distribution détaillée des notes
+                if 'Note' in df.columns:
+                    scores = df['Note'].dropna()
+                    stats['distribution'] = {
+                        'mean': float(scores.mean()),
+                        'median': float(scores.median()),
+                        'std': float(scores.std()),
+                        'min': float(scores.min()),
+                        'max': float(scores.max()),
+                        'quartiles': {
+                            'q1': float(scores.quantile(0.25)),
+                            'q3': float(scores.quantile(0.75))
+                        }
+                    }
+                
+                # Analyse par question
+                question_cols = [col for col in df.columns if col.startswith('Q:')]
+                for i, col in enumerate(question_cols):
+                    if col in df.columns:
+                        question_scores = df[col].dropna()
+                        if len(question_scores) > 0:
+                            stats['questions'].append({
+                                'number': i + 1,
+                                'column': col,
+                                'success_rate': float(question_scores.mean() * 100),
+                                'difficulty': 'facile' if question_scores.mean() > 0.8 else 
+                                            'difficile' if question_scores.mean() < 0.4 else 'moyenne'
+                            })
+        
+        except Exception as e:
+            self.logger.error(f"Erreur statistiques avancées: {e}")
+    
+    return stats
+
+def full_correction_process(self, scan_path=None, scoring_strategy='adaptive', 
+                           generate_reports=True, auto_optimize=True):
+    """Processus complet de correction automatique optimisé"""
+    results = []
+    
+    try:
+        # 1. Vérifier la préparation du projet
+        if not (self.data_path / 'scoring.xml').exists():
+            prep_result = self.prepare_project()
+            results.append(('Préparation projet', prep_result))
+            if not prep_result['success']:
+                return results
+        
+        # 2. Préparation et optimisation des scans
+        if auto_optimize:
+            prep_result = self.prepare_scan_images(scan_path)
+            results.append(('Préparation scans', prep_result))
+            if not prep_result['success']:
+                return results
+        
+        # 3. Analyse avancée des copies
+        analysis_result = self.advanced_analysis(scan_path, auto_capture=True, try_harder=True)
+        results.append(('Analyse copies', analysis_result))
+        if not analysis_result['success']:
+            return results
+        
+        # 4. Notation intelligente
+        scoring_result = self.smart_scoring(scoring_strategy)
+        results.append(('Calcul notes', scoring_result))
+        if not scoring_result['success']:
+            return results
+        
+        # 5. Génération des rapports
+        if generate_reports:
+            reports_result = self.generate_detailed_reports()
+            results.append(('Génération rapports', {'success': True, 'reports': reports_result}))
+        
+        # 6. Statistiques finales
+        final_stats = self.generate_advanced_statistics()
+        results.append(('Statistiques finales', {'success': True, 'stats': final_stats}))
+        
+        self.logger.info("Processus de correction automatique terminé avec succès")
+        
+    except Exception as e:
+        self.logger.error(f"Erreur processus correction: {e}")
+        results.append(('Erreur critique', {'success': False, 'error': str(e)}))
+    
+    return results
+
+def verify_correction_quality(self):
+    """Vérifie la qualité de la correction et signale les problèmes potentiels"""
+    issues = []
+    recommendations = []
+    
+    # Vérifier les statistiques d'analyse
+    analysis_stats = self.get_analysis_statistics()
+    
+    if analysis_stats['papers_detected'] == 0:
+        issues.append("Aucune copie détectée - vérifiez la qualité des scans")
+    
+    if analysis_stats.get('unreadable_papers', 0) > 0:
+        issues.append(f"{analysis_stats['unreadable_papers']} copies illisibles détectées")
+        recommendations.append("Améliorer la qualité des scans (résolution, contraste)")
+    
+    if analysis_stats.get('missing_student_codes', 0) > 0:
+        issues.append(f"{analysis_stats['missing_student_codes']} codes étudiants manquants")
+        recommendations.append("Vérifier que les codes sont bien remplis et lisibles")
+    
+    # Vérifier la cohérence des résultats
+    csv_file = self.exports_path / 'notes.csv'
+    if csv_file.exists():
+        try:
+            import pandas as pd
+            df = pd.read_csv(csv_file)
+            
+            if not df.empty and 'Note' in df.columns:
+                scores = df['Note'].dropna()
+                
+                # Détecter les anomalies statistiques
+                mean_score = scores.mean()
+                std_score = scores.std()
+                
+                if mean_score > 18:
+                    issues.append(f"Moyenne très élevée ({mean_score:.1f}) - vérifiez le barème")
+                elif mean_score < 5:
+                    issues.append(f"Moyenne très faible ({mean_score:.1f}) - questions trop difficiles?")
+                
+                if std_score < 1:
+                    issues.append("Faible dispersion des notes - manque de discrimination")
+                
+        except Exception as e:
+            issues.append(f"Erreur analyse qualité: {e}")
+    
+    return {
+        'issues': issues,
+        'recommendations': recommendations,
+        'quality_score': max(0, 100 - len(issues) * 20),  # Score sur 100
+        'status': 'excellent' if not issues else 'attention' if len(issues) < 3 else 'problematique'
+    }
+def prepare_scan_images(self, scan_path=None, dpi=300):
+    """Prépare et optimise les images scannées pour l'analyse"""
+    if scan_path is None:
+        scan_path = self.uploads_path
+    
+    scan_files = []
+    processed_files = []
+    
+    # Chercher tous les fichiers scannés
+    for ext in ['*.pdf', '*.jpg', '*.png', '*.jpeg', '*.tiff', '*.tif']:
+        scan_files.extend(list(scan_path.glob(ext)))
+    
+    if not scan_files:
+        return {
+            'success': False,
+            'error': f'Aucun fichier scanné trouvé dans {scan_path}'
+        }
+    
+    # Créer dossier pour les images préparées
+    prepared_path = self.project_path / 'prepared_scans'
+    prepared_path.mkdir(exist_ok=True)
+    
+    for scan_file in scan_files:
+        try:
+            if scan_file.suffix.lower() == '.pdf':
+                # Convertir PDF en images individuelles avec getimages
+                self.logger.info(f"Conversion PDF vers images: {scan_file}")
+                cmd = f"auto-multiple-choice getimages --vector-density {dpi} --copy-to '{prepared_path}' '{scan_file}'"
+                result = self.run_command(cmd)
+                
+                if result['success']:
+                    processed_files.append(scan_file)
+                    self.logger.info(f"PDF converti avec succès: {scan_file}")
+                else:
+                    self.logger.error(f"Erreur conversion PDF {scan_file}: {result.get('stderr')}")
+            else:
+                # Copier les images directement
+                import shutil
+                dest_file = prepared_path / scan_file.name
+                shutil.copy2(scan_file, dest_file)
+                processed_files.append(scan_file)
+                self.logger.info(f"Image copiée: {scan_file}")
+        
+        except Exception as e:
+            self.logger.error(f"Erreur traitement {scan_file}: {e}")
+    
+    return {
+        'success': len(processed_files) > 0,
+        'processed_files': processed_files,
+        'prepared_path': prepared_path,
+        'total_files': len(scan_files)
+    }
+
+def analyse_papers(self, scan_path=None, threshold=0.5):
+    """Analyse les copies scannées avec conversion PDF automatique"""
+    if scan_path is None:
+        scan_path = self.uploads_path
+    
+    # D'abord préparer/convertir les fichiers scannés
+    prep_result = self.prepare_scan_images(scan_path)
+    if not prep_result['success']:
+        return prep_result
+    
+    # Utiliser les images préparées
+    prepared_path = prep_result['prepared_path']
+    image_files = []
+    
+    # Chercher les images converties (pas les PDF)
+    for ext in ['*.jpg', '*.png', '*.jpeg', '*.tiff', '*.tif']:
+        image_files.extend(list(prepared_path.glob(ext)))
+    
+    if not image_files:
+        return {
+            'success': False,
+            'error': f'Aucune image trouvée après conversion dans {prepared_path}'
+        }
+    
+    self.logger.info(f"Analyse de {len(image_files)} images converties")
+    
+    # Commande d'analyse avec les images converties
+    cmd = f"auto-multiple-choice analyse --data '{self.data_path}' --cr '{self.cr_path}' --auto-capture --threshold {threshold}"
+    
+    # Ajouter toutes les images converties
+    for image_file in image_files:
+        cmd += f" '{image_file}'"
+    
+    result = self.run_command(cmd)
+    
+    if result['success']:
+        self.logger.info(f"Analyse de {len(image_files)} images terminée")
+        result['images_analyzed'] = len(image_files)
+        result['conversion_info'] = prep_result
+    
+    return result

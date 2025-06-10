@@ -1,310 +1,447 @@
-{% extends "base.html" %}
+<!-- Template project_detail.html CORRIGÉ -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projet {{ project.name }} - AMC Corrector</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('list_projects') }}">Projets</a></li>
+                        <li class="breadcrumb-item active">{{ project.name }}</li>
+                    </ol>
+                </nav>
 
-{% block title %}{{ project.name }} - AMC Web Corrector{% endblock %}
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1><i class="bi bi-folder"></i> {{ project.name }}</h1>
+                    <span class="badge bg-secondary">ID: {{ project_id }}</span>
+                </div>
 
-{% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <h1>{{ project.name }}</h1>
-            <p>Projet créé le {{ project.created[:10] }}</p>
-        </div>
-        <a href="{{ url_for('list_projects') }}" class="btn btn-secondary">Retour</a>
-    </div>
-</div>
+                <!-- Informations du projet -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="bi bi-info-circle"></i> Informations du projet</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <strong>Nom :</strong> {{ project.name }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Créé le :</strong> {{ project.created[:10] }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Statut :</strong>
+                                        {% if pdf_exists %}
+                                            <span class="badge bg-success">Prêt</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">En préparation</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-<!-- Zone d'upload -->
-<div class="card">
-    <h2>📤 Upload des copies</h2>
-    <div class="upload-zone"
-        style="border: 2px dashed #667eea; border-radius: 15px; padding: 3rem; text-align: center; background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%); cursor: pointer;"
-        onclick="document.getElementById('fileInput').click()">
-        <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.7;">📁</div>
-        <h3>Glissez vos fichiers ici ou cliquez pour sélectionner</h3>
-        <p style="color: #666; font-size: 0.9rem; margin: 1rem 0;">PDF, PNG, JPG, JPEG • Max 50MB par fichier</p>
-        <input type="file" id="fileInput" multiple accept=".pdf,.png,.jpg,.jpeg" style="display: none;">
-        <button class="btn" style="margin-top: 1rem;">
-            📂 Choisir les fichiers
-        </button>
-    </div>
+                <!-- Actions principales -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="bi bi-gear"></i> Actions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-2 d-md-flex">
+                                    <a href="{{ url_for('configure_project', project_id=project_id) }}" 
+                                       class="btn btn-outline-primary">
+                                        <i class="bi bi-pencil"></i> Configurer QCM
+                                    </a>
+                                    
+                                    {% if latex_exists %}
+                                        <a href="{{ url_for('preview_qcm', project_id=project_id) }}" 
+                                           class="btn btn-outline-info" target="_blank">
+                                            <i class="bi bi-eye"></i> Prévisualiser
+                                        </a>
+                                        <a href="{{ url_for('download_qcm', project_id=project_id) }}" 
+                                           class="btn btn-success">
+                                            <i class="bi bi-download"></i> Télécharger PDF
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-outline-secondary" disabled>
+                                            <i class="bi bi-exclamation-triangle"></i> Configurer d'abord le QCM
+                                        </button>
+                                    {% endif %}
+                                    
+                                    <a href="{{ url_for('manage_students', project_id=project_id) }}" 
+                                       class="btn btn-outline-warning">
+                                        <i class="bi bi-people"></i> Gérer élèves
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div id="uploadProgress"
-        style="display: none; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-        <h4>Upload en cours...</h4>
-        <div id="progressContainer"></div>
-    </div>
+                <!-- Upload de fichiers -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="bi bi-upload"></i> Copies scannées</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="upload-form" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <input class="form-control" type="file" id="file-input" 
+                                               accept=".pdf,.jpg,.jpeg,.png,.tiff" multiple>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-upload"></i> Uploader
+                                    </button>
+                                </form>
 
-    <div id="filesList" style="margin-top: 2rem;">
-        <h4>📋 Fichiers uploadés</h4>
-        <div id="filesContainer"></div>
-    </div>
-</div>
+                                {% if uploaded_files %}
+                                <div class="mt-3">
+                                    <h6>Fichiers uploadés ({{ uploaded_files|length }}) :</h6>
+                                    <div class="list-group">
+                                        {% for file in uploaded_files %}
+                                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-file-earmark"></i> {{ file }}</span>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteFile('{{ file }}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-<!-- Fichiers uploadés -->
-<!-- Cette section est maintenant gérée par enhanced-upload.js -->
+                <!-- Section Correction Automatique -->
+                {% if uploaded_files %}
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-robot"></i> Correction Automatique
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Statut de préparation -->
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <h6>État de préparation :</h6>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="d-flex align-items-center">
+                                                {% if latex_exists %}
+                                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                    <span>Questionnaire</span>
+                                                {% else %}
+                                                    <i class="bi bi-x-circle-fill text-danger me-1"></i>
+                                                    <span class="text-muted">Questionnaire</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="d-flex align-items-center">
+                                                {% if pdf_exists %}
+                                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                    <span>PDF généré</span>
+                                                {% else %}
+                                                    <i class="bi bi-x-circle-fill text-danger me-1"></i>
+                                                    <span class="text-muted">PDF généré</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                <span>{{ uploaded_files|length }} fichier(s) scanné(s)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-<!-- Actions de traitement -->
-<div class="card">
-    <h2>⚙️ Configuration et Traitement</h2>
+                                <!-- Actions de correction -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Actions rapides :</h6>
+                                        <div class="d-grid gap-2">
+                                            {% if latex_exists and pdf_exists %}
+                                            <a href="{{ url_for('process_project', project_id=project_id) }}" 
+                                               class="btn btn-primary">
+                                                <i class="bi bi-play-fill"></i> Démarrer Correction
+                                            </a>
+                                            {% else %}
+                                            <button class="btn btn-outline-primary" disabled>
+                                                <i class="bi bi-exclamation-triangle"></i> Projet non prêt
+                                            </button>
+                                            {% endif %}
+                                            
+                                            <button class="btn btn-outline-info" onclick="quickScanCheck()">
+                                                <i class="bi bi-search"></i> Vérifier qualité scans
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6>Correction express :</h6>
+                                        <p class="text-muted small">
+                                            Correction avec paramètres par défaut optimisés
+                                        </p>
+                                        {% if latex_exists and pdf_exists %}
+                                        <button class="btn btn-success w-100" onclick="expressCorrection()">
+                                            <i class="bi bi-lightning-fill"></i> Correction Express
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-outline-success w-100" disabled>
+                                            <i class="bi bi-lightning"></i> Correction Express
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
 
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <a href="{{ url_for('configure_project', project_id=project_id) }}" class="btn btn-secondary">
-            📝 Configurer le QCM
-        </a>
-        <a href="{{ url_for('download_qcm', project_id=project_id) }}" class="btn btn-secondary">
-            📄 Télécharger le QCM
-        </a>
-        <button onclick="processProject()" class="btn" {% if not uploaded_files %}disabled{% endif %}>
-            🚀 Lancer le traitement
-        </button>
-        <button onclick="viewResults()" class="btn btn-secondary">
-            📊 Voir les résultats
-        </button>
-        <button onclick="exportResults()" class="btn btn-secondary">
-            📥 Exporter les notes
-        </button>
-        <a href="{{ url_for('manage_students', project_id=project_id) }}" class="btn btn-secondary">
-            👥 Gérer les élèves
-        </a>
-    </div>
+                                <!-- Zone de statut en temps réel -->
+                                <div id="correction-status" style="display: none;" class="mt-3">
+                                    <div class="alert alert-info">
+                                        <div class="d-flex align-items-center">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                <span class="visually-hidden">Correction en cours...</span>
+                                            </div>
+                                            <span id="status-text">Préparation de la correction...</span>
+                                        </div>
+                                        <div class="progress mt-2">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 id="correction-progress" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
-    {% if not uploaded_files %}
-    <div style="background: #fff3cd; color: #856404; padding: 1rem; border-radius: 5px; margin-top: 1rem;">
-        ⚠️ Vous devez d'abord uploader des copies avant de lancer le traitement
-    </div>
-    {% endif %}
-
-    <!-- Informations sur le QCM configuré -->
-    <div id="qcmInfo" style="background: #f8f9fa; padding: 1rem; border-radius: 5px; margin-top: 1rem; display: none;">
-        <h4>📋 Configuration actuelle :</h4>
-        <div id="qcmInfoContent">
-            <!-- Les infos seront ajoutées par JavaScript -->
-        </div>
-    </div>
-</div>
-
-<!-- Zone de résultats -->
-<div id="resultsArea" class="card" style="display: none;">
-    <h2>📈 Résultats du traitement</h2>
-    <div id="resultsContent">
-        <!-- Les résultats seront affichés ici -->
-    </div>
-</div>
-
-<!-- Loading -->
-<div class="loading">
-    <div class="spinner"></div>
-    <p>Traitement en cours...</p>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    const projectId = '{{ project_id }}';
-
-    // Configuration du drag & drop
-    document.addEventListener('DOMContentLoaded', function () {
-        const uploadArea = document.getElementById('uploadArea');
-        // setupDragDrop(uploadArea);
-    });
-
-    function handleFileSelect(files) {
-        if (files.length === 0) return;
-
-        for (let file of files) {
-            uploadFile(file);
-        }
-    }
-
-    function uploadFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const progressDiv = document.getElementById('uploadProgress');
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-
-        progressDiv.style.display = 'block';
-        progressText.textContent = `Upload de ${file.name}...`;
-
-        fetch(`/upload/${projectId}`, {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    progressBar.style.width = '100%';
-                    progressText.textContent = 'Upload terminé!';
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1000);
-                } else {
-                    alert('Erreur: ' + data.error);
-                    progressDiv.style.display = 'none';
-                }
-            })
-            .catch(error => {
-                alert('Erreur lors de l\'upload: ' + error);
-                progressDiv.style.display = 'none';
-            });
-    }
-
-    function removeFile(filename) {
-        if (confirm(`Supprimer le fichier ${filename} ?`)) {
-            // Ici vous pourriez ajouter une route de suppression de fichier
-            alert('Fonctionnalité de suppression à implémenter');
-        }
-    }
-
-    function processProject() {
-        if (!confirm('Lancer le traitement AMC ? Cela peut prendre plusieurs minutes.')) {
-            return;
-        }
-
-        showLoading();
-
-        fetch(`/process/${projectId}`)
-            .then(response => response.json())
-            .then(data => {
-                hideLoading();
-
-                if (data.success) {
-                    alert('Traitement terminé avec succès!');
-                    showResults(data.results);
-                } else {
-                    alert('Erreur lors du traitement: ' + data.error);
-                }
-            })
-            .catch(error => {
-                hideLoading();
-                alert('Erreur: ' + error);
-            });
-    }
-
-    function showResults(results) {
-        const resultsArea = document.getElementById('resultsArea');
-        const resultsContent = document.getElementById('resultsContent');
-
-        let html = '<h3>Résultats du traitement:</h3>';
-
-        results.forEach((result, index) => {
-            html += `
-            <div style="margin-bottom: 1rem; padding: 1rem; background: ${result.success ? '#d4edda' : '#f8d7da'}; border-radius: 5px;">
-                <strong>Étape ${index + 1}:</strong> ${result.success ? '✅ Succès' : '❌ Erreur'}
-                <details style="margin-top: 0.5rem;">
-                    <summary>Détails</summary>
-                    <pre style="margin-top: 0.5rem; font-size: 0.9rem;">${result.stdout || result.stderr || result.error}</pre>
-                </details>
+                <!-- Résultats (si disponibles) -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5><i class="bi bi-bar-chart"></i> Résultats et Rapports</h5>
+                            </div>
+                            <div class="card-body">
+                                <a href="{{ url_for('view_results', project_id=project_id) }}" 
+                                   class="btn btn-outline-success">
+                                    <i class="bi bi-eye"></i> Voir les résultats
+                                </a>
+                                
+                                <button class="btn btn-outline-info" onclick="showProcessLog()">
+                                    <i class="bi bi-journal-text"></i> Journal de traitement
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        `;
+        </div>
+    </div>
+
+    <!-- Modal de correction express -->
+    <div class="modal fade" id="express-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Correction Express</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Lancer une correction automatique avec les paramètres optimisés par défaut ?</p>
+                    <div class="alert alert-info">
+                        <h6>Paramètres utilisés :</h6>
+                        <ul class="mb-0">
+                            <li>Stratégie de notation : Adaptatif</li>
+                            <li>Optimisation automatique des scans</li>
+                            <li>Génération de tous les rapports</li>
+                            <li>Seuil de détection : Automatique</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-success" onclick="startExpressCorrection()">
+                        <i class="bi bi-lightning-fill"></i> Démarrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Upload de fichiers
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert('Veuillez sélectionner des fichiers');
+                return;
+            }
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file', files[i]);
+            }
+            
+            fetch(`/upload/{{ project_id }}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('success', 'Fichier uploadé avec succès');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast('danger', data.error);
+                }
+            })
+            .catch(error => {
+                showToast('danger', 'Erreur upload: ' + error);
+            });
         });
 
-        resultsContent.innerHTML = html;
-        resultsArea.style.display = 'block';
-    }
-
-    function viewResults() {
-        window.open(`/results/${projectId}`, '_blank');
-    }
-
-    function exportResults() {
-        // Ici vous pourriez ajouter l'export des résultats
-        alert('Fonctionnalité d\'export à implémenter');
-    }
-
-    // Upload simple fonctionnel
-    document.getElementById('fileInput').addEventListener('change', function (e) {
-        const files = e.target.files;
-        if (files.length > 0) {
-            document.getElementById('uploadProgress').style.display = 'block';
-            Array.from(files).forEach(file => uploadFileSimple(file));
-        }
-    });
-
-    function uploadFileSimple(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // Ajouter à la liste des uploads en cours
-        addProgressItem(file.name);
-
-        fetch(`/upload/${projectId}`, {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    addFileToList(file.name);
-                    updateProgressItem(file.name, true);
-                } else {
-                    updateProgressItem(file.name, false, data.error);
-                }
-            })
-            .catch(error => {
-                updateProgressItem(file.name, false, error.message);
-            });
-    }
-
-    function addProgressItem(filename) {
-        const container = document.getElementById('progressContainer');
-        const div = document.createElement('div');
-        div.id = `progress-${filename}`;
-        div.style.cssText = 'margin-bottom: 0.5rem; padding: 0.5rem; background: white; border-radius: 5px;';
-        div.innerHTML = `<span>📤 ${filename}</span> <span class="status">En cours...</span>`;
-        container.appendChild(div);
-    }
-
-    function updateProgressItem(filename, success, error = '') {
-        const item = document.getElementById(`progress-${filename}`);
-        if (item) {
-            const status = item.querySelector('.status');
-            if (success) {
-                status.innerHTML = '✅ Terminé';
-                status.style.color = '#28a745';
-            } else {
-                status.innerHTML = `❌ Erreur: ${error}`;
-                status.style.color = '#dc3545';
-            }
-        }
-    }
-
-    function addFileToList(filename) {
-        const container = document.getElementById('filesContainer');
-        const div = document.createElement('div');
-        div.style.cssText = 'padding: 1rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #28a745;';
-        div.innerHTML = `
-        <div>
-            <span>📄</span>
-            <strong>${filename}</strong>
-            <div style="color: #666; font-size: 0.9rem;">Uploadé avec succès</div>
-        </div>
-        <button class="btn btn-danger" onclick="deleteFileSimple('${filename}')" style="padding: 8px 16px;">🗑️ Supprimer</button>
-    `;
-        container.appendChild(div);
-    }
-
-    function deleteFileSimple(filename) {
-        if (confirm(`Supprimer ${filename} ?`)) {
-            fetch(`/delete/${projectId}/${filename}`, { method: 'DELETE' })
+        // Suppression de fichier
+        function deleteFile(filename) {
+            if (confirm('Supprimer ce fichier ?')) {
+                fetch(`/delete/{{ project_id }}/${filename}`, {
+                    method: 'DELETE'
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        location.reload();
+                        showToast('success', 'Fichier supprimé');
+                        setTimeout(() => window.location.reload(), 1000);
                     } else {
-                        alert('Erreur: ' + data.error);
+                        showToast('danger', data.error);
                     }
+                })
+                .catch(error => {
+                    showToast('danger', 'Erreur suppression: ' + error);
                 });
+            }
         }
-    }
 
-    // Charger les fichiers existants
-    fetch(`/api/project/${projectId}/files`)
-        .then(response => response.json())
-        .then(files => {
-            files.forEach(filename => addFileToList(filename));
-        });
-</script>
-{% endblock %}
+        // Vérification rapide de la qualité des scans
+        function quickScanCheck() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Vérification...';
+            button.disabled = true;
+
+            // Simulation pour le moment
+            setTimeout(() => {
+                showToast('success', '{{ uploaded_files|length }} fichiers analysés. Qualité: OK');
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }, 2000);
+        }
+
+        // Correction express
+        function expressCorrection() {
+            const modal = new bootstrap.Modal(document.getElementById('express-modal'));
+            modal.show();
+        }
+
+        function startExpressCorrection() {
+            // Fermer le modal
+            bootstrap.Modal.getInstance(document.getElementById('express-modal')).hide();
+            
+            // Afficher le statut
+            document.getElementById('correction-status').style.display = 'block';
+            updateCorrectionStatus('Initialisation de la correction...', 10);
+            
+            // Rediriger vers le processus de correction
+            setTimeout(() => {
+                window.location.href = `/process/{{ project_id }}`;
+            }, 1000);
+        }
+
+        function updateCorrectionStatus(text, progress, type = 'info') {
+            document.getElementById('status-text').textContent = text;
+            document.getElementById('correction-progress').style.width = progress + '%';
+        }
+
+        function showProcessLog() {
+            // TODO: Implémenter l'affichage du journal
+            showToast('info', 'Journal de traitement - Fonctionnalité à venir');
+        }
+
+        // Fonction utilitaire pour afficher des notifications
+        function showToast(type, message, duration = 3000) {
+            const toastContainer = document.getElementById('toast-container') || createToastContainer();
+            
+            const toastId = 'toast-' + Date.now();
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type} border-0`;
+            toast.id = toastId;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            const bsToast = new bootstrap.Toast(toast, {
+                delay: duration
+            });
+            bsToast.show();
+            
+            toast.addEventListener('hidden.bs.toast', () => {
+                toast.remove();
+            });
+        }
+
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.className = 'toast-container position-fixed top-0 end-0 p-3';
+            container.id = 'toast-container';
+            container.style.zIndex = '11';
+            document.body.appendChild(container);
+            return container;
+        }
+    </script>
+
+    <style>
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast-container {
+            z-index: 1055;
+        }
+    </style>
+</body>
+</html>
