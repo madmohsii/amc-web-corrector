@@ -90,8 +90,77 @@ class AMCManager:
     def _generate_latex_header_french(self, title, subject, duration, instructions, csv_filename=None):
     
     
-    # Version sans CSV avec code élève simple
-        if csv_filename is None or not os.path.exists(self.project_path / csv_filename):
+    # Version avec CSV et codes pré-cochés
+        if csv_filename is not None and os.path.exists(self.project_path / csv_filename):
+            return f"""\\documentclass[12pt,a4paper]{{article}}
+
+\\usepackage{{csvsimple,graphicx,pifont}}%
+\\usepackage[francais,bloc]{{automultiplechoice}}
+\\usepackage[utf8]{{inputenc}}    
+\\usepackage[T1]{{fontenc}}
+\\usepackage{{geometry}}
+
+\\usepackage{{verbatimbox}}
+\\usepackage{{tcolorbox}}
+
+\\newtcolorbox{{codebox}}{{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\\linewidth}}
+
+% Configuration de la géométrie
+\\geometry{{hmargin=2cm,top=4cm,bottom=2cm}}
+
+\\newcommand{{\\sujet}}{{
+	\\exemplaire{{1}}{{%
+		% En-tête avec code élève PRÉ-COCHÉ automatiquement
+		\\noindent
+		\\begin{{minipage}}[t]{{0.3\\textwidth}}
+			\\textbf{{Code élève}}\\\\[0.3cm]
+			% Code élève PRÉ-COCHÉ basé sur l'ID du CSV
+			\\AMCcode{{etudiant}}{{\\id}}
+		\\end{{minipage}}%
+		\\hfill
+		\\begin{{minipage}}[t]{{0.65\\textwidth}}
+			\\framebox[\\textwidth]{{%
+				\\begin{{minipage}}{{0.95\\textwidth}}
+					\\centering
+					\\textbf{{Nom et prénom :}} \\nom{{}} \\prenom{{}}\\\\[0.5cm]
+					\\dotfill\\\\[0.5cm]
+					\\dotfill
+				\\end{{minipage}}
+			}}
+		\\end{{minipage}}
+		
+		\\vspace{{1cm}}
+		
+		\\begin{{center}}
+			\\textbf{{{title}}}\\\\[0.3cm]
+			{subject}\\\\[0.2cm]
+			Durée : {duration}.\\\\[0.5cm]
+			\\textbf{{{instructions}}}
+		\\end{{center}}
+		
+		\\vspace{{1cm}}
+		
+		\\restituegroupe{{CN}}
+		\\AMCassociation{{\\id}}
+		\\AMCaddpagesto{{4}}
+	    }}
+    }}
+
+\\begin{{document}}
+	\\AMCrandomseed{{1237893}}
+	\\def\\AMCformQuestion#1{{{{\\sc Question #1 :}}}}
+	\\setdefaultgroupmode{{withoutreplacement}}
+
+	% Génération automatique des copies avec codes pré-cochés
+	\\csvreader[head to column names]{{{csv_filename}}}{{}}{{%
+		\\sujet
+	    }}
+
+\\end{{document}}
+
+"""
+        else:
+        # Version sans CSV avec code élève vide (à remplir manuellement)
             return f"""\\documentclass[12pt,a4paper]{{article}}
 
 \\usepackage{{graphicx,pifont}}%
@@ -105,16 +174,16 @@ class AMCManager:
 
 \\newtcolorbox{{codebox}}{{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\\linewidth}}
 
-% Configuration de la géométrie pour laisser plus de place en haut
+% Configuration de la géométrie
 \\geometry{{hmargin=2cm,top=4cm,bottom=2cm}}
 
 \\newcommand{{\\sujet}}{{
 	\\exemplaire{{1}}{{%
-		% En-tête avec code élève simple et nom/prénom
+		% En-tête avec code élève VIDE (à remplir manuellement)
 		\\noindent
 		\\begin{{minipage}}[t]{{0.3\\textwidth}}
 			\\textbf{{Code élève}}\\\\[0.3cm]
-			% Code élève avec 2 chiffres seulement
+			% Code élève avec 2 chiffres VIDES
 			\\AMCcode{{etudiant}}{{2}}
 		\\end{{minipage}}%
 		\\hfill
@@ -151,68 +220,6 @@ class AMCManager:
 	\\def\\AMCformQuestion#1{{{{\\sc Question #1 :}}}}
 	\\setdefaultgroupmode{{withoutreplacement}}
 
-"""
-        else:
-        # Version avec CSV et code élève simple
-            return f"""\\documentclass[12pt,a4paper]{{article}}
-
-\\usepackage{{csvsimple,graphicx,pifont}}%
-\\usepackage[francais,bloc]{{automultiplechoice}}
-\\usepackage[utf8]{{inputenc}}    
-\\usepackage[T1]{{fontenc}}
-\\usepackage{{geometry}}
-
-\\usepackage{{verbatimbox}}
-\\usepackage{{tcolorbox}}
-
-\\newtcolorbox{{codebox}}{{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\\linewidth}}
-
-% Configuration de la géométrie
-\\geometry{{hmargin=2cm,top=4cm,bottom=2cm}}
-
-\\newcommand{{\\sujet}}{{
-	\\exemplaire{{1}}{{%
-		% En-tête avec code élève et nom/prénom depuis CSV
-		\\noindent
-		\\begin{{minipage}}[t]{{0.3\\textwidth}}
-			\\textbf{{Code élève}}\\\\[0.3cm]
-			% Code élève avec 2 chiffres seulement
-			\\AMCcode{{etudiant}}{{2}}
-		\\end{{minipage}}%
-		\\hfill
-		\\begin{{minipage}}[t]{{0.65\\textwidth}}
-			\\framebox[\\textwidth]{{%
-				\\begin{{minipage}}{{0.95\\textwidth}}
-					\\centering
-					\\textbf{{Nom et prénom :}} \\nom{{}} \\prenom{{}}\\\\[0.5cm]
-					\\dotfill\\\\[0.5cm]
-					\\dotfill
-				\\end{{minipage}}
-			    }}
-		\\end{{minipage}}
-		
-		\\vspace{{1cm}}
-		
-		\\begin{{center}}
-			\\textbf{{{title}}}\\\\[0.3cm]
-			{subject}\\\\[0.2cm]
-			Durée : {duration}.\\\\[0.5cm]
-			\\textbf{{{instructions}}}
-		\\end{{center}}
-		
-		\\vspace{{1cm}}
-		
-		\\restituegroupe{{CN}}
-		\\AMCassociation{{\\id}}
-		\\AMCaddpagesto{{4}}
-	    }}
-    }}
-
-\\begin{{document}}
-	\\AMCrandomseed{{1237893}}
-	\\def\\AMCformQuestion#1{{{{\\sc Question #1 :}}}}
-	\\setdefaultgroupmode{{withoutreplacement}}
-
     """
     
     def _generate_question_latex_french(self, question):
@@ -240,21 +247,34 @@ class AMCManager:
     def _generate_latex_footer_french(self, csv_filename=None):
     
     
-    # Si pas de CSV, on génère une seule copie simple
-        if csv_filename is None or not os.path.exists(self.project_path / csv_filename):
-            return f"""
-%% GÉNÉRATION D'UNE COPIE SIMPLE %%
-\\sujet
+    # Vérifier explicitement si le CSV existe et contient des données
+        if csv_filename is not None:
+            csv_path = self.project_path / csv_filename
+            if csv_path.exists():
+                try:
+                    with open(csv_path, 'r', encoding='utf-8') as f:
+                        import csv
+                        reader = csv.DictReader(f)
+                        csv_data = list(reader)
+                        if len(csv_data) > 0:
+                        # Version avec CSV - génération multiple
+                            print(f"Footer: Utilisation du CSV avec {len(csv_data)} élèves")
+                            return f"""
+    %% GÉNÉRATION DES COPIES AVEC CSV %%
+    \\csvreader[head to column names]{{{csv_filename}}}{{}}{{\\sujet}}
 
-\\end{{document}}
+    \\end{{document}}
     """
-        else:
-        # Version avec CSV
-            return f"""
-%% GÉNÉRATION DES COPIES AVEC CSV %%
-\\csvreader[head to column names]{{{csv_filename}}}{{}}{{\\sujet}}
+                except Exception as e:
+                    print(f"Erreur lecture CSV dans footer: {e}")
+    
+    # Version sans CSV - copie unique
+        print("Footer: Mode copie unique")
+        return f"""
+    %% GÉNÉRATION D'UNE COPIE SIMPLE %%
+    \\sujet
 
-\\end{{document}}
+    \\end{{document}}
     """
     
     def create_student_list_csv(self, students_data=None, csv_filename="liste.csv"):
@@ -279,29 +299,43 @@ class AMCManager:
     
     def create_complete_questionnaire(self, questions_data, students_data=None, title="QCM", subject="", duration="60 minutes", csv_filename="liste.csv"):
     
-    
         print(f"=== Création questionnaire dans {self.project_path} ===")
         print(f"Nombre de questions: {len(questions_data)}")
         print(f"Titre: {title}")
+
+    # Vérifier explicitement si le CSV existe
+        csv_path = self.project_path / csv_filename
+        csv_exists = csv_path.exists()
+        print(f"Vérification CSV: {csv_path} - Existe: {csv_exists}")
     
-    # Créer le fichier CSV seulement si des données étudiants sont fournies
-        csv_file_created = False
-        if students_data is not None and len(students_data) > 0:
-            print("Création du fichier CSV des étudiants...")
-            self.create_student_list_csv(students_data, csv_filename)
-            csv_file_created = True
-        else:
-            print("Pas de données étudiants - pas de CSV créé")
-            csv_filename = None
+        if csv_exists:
+        # Lire le contenu du CSV pour voir s'il contient des données
+            try:
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    import csv
+                    reader = csv.DictReader(f)
+                    csv_data = list(reader)
+                    print(f"CSV trouvé avec {len(csv_data)} élèves")
+                    for student in csv_data:
+                        print(f"  - {student.get('prenom', '')} {student.get('nom', '')} (code: {student.get('code', '')})")
+            except Exception as e:
+                print(f"Erreur lecture CSV: {e}")
+                csv_exists = False
     
     # Créer le fichier LaTeX
         print("Création du fichier LaTeX...")
+    
+    # FORCER l'utilisation du CSV si il existe et contient des données
+        use_csv = csv_exists and len(csv_data) > 0 if csv_exists else False
+        print(f"Utilisation du CSV: {use_csv}")
+    
         latex_file = self.create_latex_template(
-            questions_data, title, subject, duration, csv_filename=csv_filename
+            questions_data, title, subject, duration, 
+            csv_filename=csv_filename if use_csv else None
         )
-    
+
         print(f"Fichier LaTeX créé: {latex_file}")
-    
+
     # Vérifier que le fichier a bien été créé
         if latex_file.exists():
             file_size = latex_file.stat().st_size
@@ -309,12 +343,18 @@ class AMCManager:
         
         # Lire et afficher un extrait pour debug
             with open(latex_file, 'r', encoding='utf-8') as f:
-                content = f.read(300)
-                print(f"Début du contenu:\n{content[:300]}...")
+                content = f.read()
+                print(f"Début du contenu:\n{content[:500]}...")
+            
+            # Vérifier si csvreader est présent
+                if 'csvreader' in content:
+                    print("✅ Template utilise bien csvreader (mode multi-copies)")
+                else:
+                    print("❌ Template en mode copie unique")
         else:
             print("ERREUR: Le fichier LaTeX n'a pas été créé!")
             raise Exception(f"Le fichier LaTeX n'a pas pu être créé: {latex_file}")
-    
+
         return latex_file
 
     def create_latex_template(self, questions_data, title="QCM", subject="", duration="60 minutes", 
