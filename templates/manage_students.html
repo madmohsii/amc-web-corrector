@@ -17,23 +17,11 @@
 <div class="card">
     <h2>📋 Options rapides</h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-        <button onclick="addStudents(5)" class="btn btn-secondary">
-            ➕ Ajouter 5 élèves
-        </button>
-        <button onclick="addStudents(10)" class="btn btn-secondary">
-            ➕ Ajouter 10 élèves
-        </button>
-        <button onclick="addStudents(20)" class="btn btn-secondary">
-            ➕ Ajouter 20 élèves
-        </button>
         <button onclick="clearAll()" class="btn btn-danger">
             🗑️ Vider tout
         </button>
         <button onclick="importCSV()" class="btn">
             📁 Importer CSV
-        </button>
-        <button onclick="generateCodes()" class="btn">
-            🔢 Générer codes auto
         </button>
     </div>
 </div>
@@ -57,7 +45,7 @@
     <div class="card">
         <div style="display: flex; gap: 1rem; justify-content: center;">
             <button type="submit" class="btn">💾 Sauvegarder la liste</button>
-            <button type="button" onclick="previewCodes()" class="btn btn-secondary">👁️ Aperçu des codes</button>
+            
         </div>
     </div>
 </form>

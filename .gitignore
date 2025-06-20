@@ -1,72 +1,30 @@
-# Environnement virtuel Python
-venv/
-env/
-ENV/
+# Projets AMC (données temporaires)
+amc-projects/*/data/
+amc-projects/*/cr/
+amc-projects/*/exports/
+amc-projects/*/uploads/
+amc-projects/*/prepared_scans/
+amc-projects/*/*.aux
+amc-projects/*/*.log
+amc-projects/*/*.pdf
+amc-projects/*/*.png
 
 # Fichiers Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+env/
+.venv/
 
-# Fichiers uploadés et projets (données sensibles)
-uploads/
-amc-projects/
-results/
-*.pdf
-*.png
-*.jpg
-*.jpeg
-
-# Logs et bases de données
-*.log
-*.sqlite3
-*.db
-
-# Configuration locale
-.env
-config.local.py
-instance/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
+# Fichiers de sauvegarde
+*.backup
 *~
 
-# OS
-.DS_Store
-Thumbs.db
+# Logs
+*.log
 
-# Flask
-instance/
-.webassets-cache
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-
-# Fichiers temporaires
-*.tmp
-*.temp
-.cache/
+# Fichiers de configuration locaux
+config.local.py
+.env

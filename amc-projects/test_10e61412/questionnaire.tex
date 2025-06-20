@@ -1,0 +1,89 @@
+\documentclass[12pt,a4paper]{article}
+
+    \usepackage{csvsimple,graphicx,pifont}
+    \usepackage[francais,bloc]{automultiplechoice}
+    \usepackage[utf8]{inputenc}    
+    \usepackage[T1]{fontenc}
+    \usepackage{verbatimbox}
+    \usepackage{tcolorbox}
+
+    \newtcolorbox{codebox}{colback=gray!5!white, colframe=black, boxrule=0.5mm, arc=3mm, width=\linewidth}
+
+    \newcommand{\sujet}{
+        \exemplaire{1}{%
+            \begin{center}
+                \noindent{}\fbox{\vspace*{3mm}
+                    \Large\bf\nom{}~\prenom{}\normalsize{}
+                    \vspace*{3mm}
+                }
+            \end{center}
+            
+            \begin{center}\em
+                \textbf{QCM}
+                
+                
+                
+                Durée : 60 minutes.
+                
+                \vspace{0.2cm}
+                
+                \textbf{Vous ne devez cocher qu'une seule case. 1 point par bonne réponse. -0.5 point par mauvaise réponse ou si plusieurs cases sont cochées. 0 point si aucune case n'est cochée pour la même question.}
+            \end{center}
+            
+            \vspace{1ex}
+            
+            \restituegroupe{CN}
+            
+            \AMCassociation{\id}
+            
+            \AMCaddpagesto{2}
+        }
+    }
+
+    \begin{document}
+        \AMCrandomseed{1237893}
+        \def\AMCformQuestion#1{{\\sc Question #1 :}}
+        \setdefaultgroupmode{withoutreplacement}
+
+        \element{CN}{
+        \begin{question}{q1}\scoring{b=1,m=-.5,p=-0.5}
+            Quelle est la capitale de la France ?
+            \begin{reponseshoriz}
+                \bonne{Paris}
+                \mauvaise{Londres}
+                \mauvaise{Berlin}
+                \mauvaise{Madrid}
+            \end{reponseshoriz}
+        \end{question}
+    }
+
+    \element{CN}{
+        \begin{question}{q2}\scoring{b=1,m=-.5,p=-0.5}
+            Combien font 2 + 2 ?
+            \begin{reponseshoriz}
+                \mauvaise{3}
+                \bonne{4}
+                \mauvaise{5}
+                \mauvaise{6}
+            \end{reponseshoriz}
+        \end{question}
+    }
+
+    \element{CN}{
+        \begin{question}{q3}\scoring{b=1,m=-.5,p=-0.5}
+            Quel est le plus grand océan du monde ?
+            \begin{reponseshoriz}
+                \mauvaise{Océan Atlantique}
+                \bonne{Océan Pacifique}
+                \mauvaise{Océan Indien}
+                \mauvaise{Océan Arctique}
+            \end{reponseshoriz}
+        \end{question}
+    }
+
+
+    %%%% fin des groupes
+
+    \csvreader[head to column names]{liste.csv}{}{\sujet}
+
+\end{document}

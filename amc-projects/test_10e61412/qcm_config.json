@@ -1,0 +1,74 @@
+{
+  "title": "QCM",
+  "subject": "",
+  "duration": "60 minutes",
+  "num_pages": 2,
+  "questions": [
+    {
+      "id": "q1",
+      "text": "Quelle est la capitale de la France ?",
+      "choices": [
+        {
+          "text": "Paris",
+          "correct": true
+        },
+        {
+          "text": "Londres",
+          "correct": false
+        },
+        {
+          "text": "Berlin",
+          "correct": false
+        },
+        {
+          "text": "Madrid",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "text": "Combien font 2 + 2 ?",
+      "choices": [
+        {
+          "text": "3",
+          "correct": false
+        },
+        {
+          "text": "4",
+          "correct": true
+        },
+        {
+          "text": "5",
+          "correct": false
+        },
+        {
+          "text": "6",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "text": "Quel est le plus grand océan du monde ?",
+      "choices": [
+        {
+          "text": "Océan Atlantique",
+          "correct": false
+        },
+        {
+          "text": "Océan Pacifique",
+          "correct": true
+        },
+        {
+          "text": "Océan Indien",
+          "correct": false
+        },
+        {
+          "text": "Océan Arctique",
+          "correct": false
+        }
+      ]
+    }
+  ]
+}

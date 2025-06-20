@@ -1,0 +1,6 @@
+\message{VAR:project:pdfform=0}
+\message{TOTAL=1}
+\message{NUM=1=simple}
+\message{FQ}
+\answer{1/1:case:simple:1,1}{}
+\answer{1/1:case:simple:1,2}{}

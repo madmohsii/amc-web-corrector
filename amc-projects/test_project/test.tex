@@ -1,0 +1,45 @@
+documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{automultiplechoice}
+
+\begin{document}
+
+\element{questions}{
+    \begin{question}{q1}
+        Quelle est la capitale de la France ?
+        \begin{choices}
+            \correctchoice{Paris}
+            \wrongchoice{Londres}
+            \wrongchoice{Berlin}
+            \wrongchoice{Madrid}
+        \end{choices}
+    \end{question}
+}
+
+\element{questions}{
+    \begin{question}{q2}
+        Combien font 2 + 2 ?
+        \begin{choices}
+            \wrongchoice{3}
+            \correctchoice{4}
+            \wrongchoice{5}
+            \wrongchoice{6}
+        \end{choices}
+    \end{question}
+}
+
+\onecopy{1}{
+\noindent{\bf Nom et prénom :} \champnom{\fbox{
+    \begin{minipage}{.5\linewidth}
+        Nom et prénom :\hspace*{\fill}\\ \vspace*{.5cm}\vspace*{1mm}
+    \end{minipage}
+}}
+
+\begin{center}{\large\bf QCM Test}\end{center}
+
+\restituegroupe{questions}
+}
+
+\end{document}

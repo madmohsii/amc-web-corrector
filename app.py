@@ -10,7 +10,14 @@ import shutil
 from amc_manager import AMCManager
 from sample_questions import SAMPLE_QUESTIONS, SCORING_STRATEGIES
 from dashboard import register_dashboard_routes
+from pathlib import Path
 
+
+import sys # Ajoutez cette ligne
+
+# AJOUTEZ CES DEUX LIGNES ICI :
+print(f"DEBUG: AMCManager loaded from module: {AMCManager.__module__}")
+print(f"DEBUG: AMCManager file path: {sys.modules['amc_manager'].__file__}")
 app = Flask(__name__)
 app.secret_key = 'votre-cle-secrete-ici'  # Changez ceci en production
 
@@ -29,6 +36,16 @@ register_dashboard_routes(app, AMC_PROJECTS_FOLDER)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def convert_paths_to_strings(obj):
+    if isinstance(obj, dict):
+        return {k: convert_paths_to_strings(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_paths_to_strings(elem) for elem in obj]
+    elif isinstance(obj, Path):
+        return str(obj)
+    else:
+        return obj
 
 def run_amc_command(command, project_path):
     """Exécute une commande AMC et retourne le résultat"""
@@ -57,6 +74,87 @@ def run_amc_command(command, project_path):
 def index():
     return redirect(url_for('dashboard'))
 
+@app.route('/download_csv/<project_id>')
+def download_csv_results(project_id):
+    """Télécharger le fichier de résultats CSV"""
+    try:
+        # Utiliser le même chemin que dans vos autres routes
+        project_path = Path('amc-projects') / project_id  # ou la variable que vous utilisez
+        if not project_path.exists():
+            flash(f'Projet {project_id} non trouvé', 'error')
+            return redirect(url_for('index'))
+        
+        # Chercher le fichier notes.csv
+        csv_file = project_path / 'exports' / 'notes.csv'
+        
+        if not csv_file.exists():
+            flash('Fichier de résultats non trouvé. Effectuez d\'abord la correction.', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
+        
+        # Vérifier que le fichier n'est pas vide
+        if csv_file.stat().st_size == 0:
+            flash('Le fichier de résultats est vide.', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
+        
+        app.logger.info(f"Téléchargement du CSV: {csv_file} -> notes_{project_id}.csv")
+        
+        return send_file(
+            csv_file,
+            as_attachment=True,
+            download_name=f'notes_{project_id}.csv',
+            mimetype='text/csv'
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Erreur téléchargement CSV pour {project_id}: {e}")
+        flash(f'Erreur lors du téléchargement: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id)) 
+
+@app.route('/download_zip/<project_id>')
+def download_annotated_zip(project_id):
+    """Télécharger les copies annotées en ZIP"""
+    try:
+        # Utiliser le même chemin que dans vos autres routes
+        project_path = Path('amc-projects') / project_id  # ou la variable que vous utilisez
+        if not project_path.exists():
+            flash(f'Projet {project_id} non trouvé', 'error')
+            return redirect(url_for('index'))
+        
+        # Dossier des copies annotées
+        annotated_dir = project_path / 'exports' / 'annotated'
+        
+        if not annotated_dir.exists() or not any(annotated_dir.iterdir()):
+            flash('Copies annotées non trouvées. Effectuez d\'abord la correction.', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
+        
+        # Créer un fichier ZIP temporaire
+        import zipfile
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_zip:
+            with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for file_path in annotated_dir.rglob('*'):
+                    if file_path.is_file():
+                        # Nom relatif dans le ZIP
+                        arcname = file_path.relative_to(annotated_dir)
+                        zf.write(file_path, arcname)
+            
+            app.logger.info(f"Téléchargement des copies annotées: {temp_zip.name} -> copies_annotees_{project_id}.zip")
+            
+            return send_file(
+                temp_zip.name,
+                as_attachment=True,
+                download_name=f'copies_annotees_{project_id}.zip',
+                mimetype='application/zip'
+            )
+        
+    except Exception as e:
+        app.logger.error(f"Erreur téléchargement copies annotées pour {project_id}: {e}")
+        flash(f'Erreur lors du téléchargement: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
+
+
 @app.route('/download_qcm/<project_id>')
 def download_qcm(project_id):
     """Télécharger le QCM en PDF"""
@@ -78,7 +176,7 @@ def download_qcm(project_id):
             if os.path.exists(config_file):
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config_data = json.load(f)
-                    questions_data = config_data.get('questions', [])
+                    questions_data = config_data.get('num_pages', 2)
                     title = config_data.get('title', 'QCM')
                     subject = config_data.get('subject', '')
                     duration = config_data.get('duration', '60 minutes')
@@ -316,40 +414,8 @@ def list_projects():
     
     return render_template('projects.html', projects=projects)
 
-@app.route('/project/<project_id>')
-def project_detail(project_id):
-    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-    info_file = os.path.join(project_path, 'project_info.json')
-    
-    if not os.path.exists(info_file):
-        flash('Projet non trouvé', 'error')
-        return redirect(url_for('list_projects'))
-    
-    with open(info_file, 'r') as f:
-        project_info = json.load(f)
-    
-    # Vérifier les fichiers uploadés
-    uploads_path = os.path.join(project_path, 'uploads')
-    uploaded_files = []
-    if os.path.exists(uploads_path):
-        uploaded_files = os.listdir(uploads_path)
-    
-    # Vérifier si un PDF existe
-    pdf_exists = False
-    for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
-        if os.path.exists(os.path.join(project_path, pdf_name)):
-            pdf_exists = True
-            break
-    
-    # Vérifier si un LaTeX existe
-    latex_exists = os.path.exists(os.path.join(project_path, 'questionnaire.tex'))
-    
-    return render_template('project_detail.html', 
-                         project=project_info, 
-                         project_id=project_id,
-                         uploaded_files=uploaded_files,
-                         pdf_exists=pdf_exists,
-                         latex_exists=latex_exists)
+
+
 
 @app.route('/upload/<project_id>', methods=['POST'])
 def upload_file(project_id):
@@ -402,7 +468,7 @@ def process_project(project_id):
             amc.create_complete_questionnaire(formatted_sample)
         
         # Processus complet avec scoring français
-        results = amc.full_process(scoring_strategy='french', scan_path=uploads_path)
+        results = amc.full_correction_process(scoring_strategy='french', auto_optimize=True, generate_reports=True)
         
         # Formater les résultats pour l'affichage
         formatted_results = []
@@ -428,117 +494,9 @@ def process_project(project_id):
             'error': f'Erreur lors du traitement: {str(e)}'
         })
 
-@app.route('/results/<project_id>')
-def view_results(project_id):
-    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-    results_path = os.path.join(project_path, 'cr')
-    exports_path = os.path.join(project_path, 'exports')
-    
-    # Ici vous devriez parser les résultats AMC
-    # Pour le moment, on affiche juste les fichiers générés
-    
-    results = []
-    for path in [results_path, exports_path]:
-        if os.path.exists(path):
-            for file in os.listdir(path):
-                if file.endswith('.csv') or file.endswith('.pdf') or file.endswith('.ods'):
-                    results.append(file)
-    
-    return render_template('results.html', 
-                         project_id=project_id, 
-                         results=results)
 
-@app.route('/configure/<project_id>', methods=['GET', 'POST'])
-def configure_project(project_id):
-    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-    info_file = os.path.join(project_path, 'project_info.json')
-    
-    if not os.path.exists(info_file):
-        flash('Projet non trouvé', 'error')
-        return redirect(url_for('list_projects'))
-    
-    with open(info_file, 'r') as f:
-        project_info = json.load(f)
-    
-    if request.method == 'POST':
-        # Traiter la configuration du QCM
-        questions_data = []
-        
-        # Récupérer les paramètres généraux
-        title = request.form.get('title', 'QCM')
-        subject = request.form.get('subject', '')
-        duration = request.form.get('duration', '60 minutes')
-        
-        # Récupérer les questions du formulaire
-        question_count = int(request.form.get('question_count', 0))
-        
-        for i in range(question_count):
-            question_text = request.form.get(f'question_{i}_text')
-            if question_text:
-                choices = []
-                choice_count = int(request.form.get(f'question_{i}_choice_count', 0))
-                
-                for j in range(choice_count):
-                    choice_text = request.form.get(f'question_{i}_choice_{j}_text')
-                    is_correct = request.form.get(f'question_{i}_choice_{j}_correct') == 'on'
-                    
-                    if choice_text:
-                        choices.append({
-                            'text': choice_text,
-                            'correct': is_correct
-                        })
-                
-                questions_data.append({
-                    'id': f'q{i+1}',
-                    'text': question_text,
-                    'choices': choices,
-                    'comment': f'Question {i+1}'
-                })
-        
-        # Sauvegarder la configuration
-        config_file = os.path.join(project_path, 'qcm_config.json')
-        config = {
-            'title': title,
-            'subject': subject,
-            'duration': duration,
-            'questions': questions_data
-        }
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        
-        # Créer le fichier LaTeX avec AMCManager
-        try:
-            amc = AMCManager(project_path)
-            latex_file = amc.create_complete_questionnaire(
-                questions_data, 
-                title=title, 
-                subject=subject, 
-                duration=duration
-            )
-            flash('Configuration du QCM sauvegardée avec succès!', 'success')
-        except Exception as e:
-            flash(f'Erreur lors de la création du LaTeX: {str(e)}', 'error')
-        
-        return redirect(url_for('project_detail', project_id=project_id))
-    
-    # Charger la configuration existante si elle existe
-    config_file = os.path.join(project_path, 'qcm_config.json')
-    existing_config = {
-        'title': 'QCM',
-        'subject': '',
-        'duration': '60 minutes',
-        'questions': []
-    }
-    if os.path.exists(config_file):
-        with open(config_file, 'r', encoding='utf-8') as f:
-            existing_config = json.load(f)
-    
-    return render_template('configure_qcm.html', 
-                         project=project_info, 
-                         project_id=project_id,
-                         existing_config=existing_config,
-                         sample_questions=SAMPLE_QUESTIONS,
-                         scoring_strategies=SCORING_STRATEGIES)
+
+
 
 @app.route('/api/project/<project_id>/files')
 def api_project_files(project_id):
@@ -745,48 +703,47 @@ def correct_project(project_id):
                          scoring_options=scoring_options)
 
 @app.route('/api/correction/start/<project_id>', methods=['POST'])
-def api_start_correction(project_id):
-    """API pour démarrer la correction en arrière-plan"""
-    try:
-        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-        amc = AMCManager(project_path)
-        
-        # Récupérer les paramètres JSON
-        params = request.get_json() or {}
-        scoring_strategy = params.get('scoring_strategy', 'adaptive')
-        auto_optimize = params.get('auto_optimize', True)
-        
-        # Démarrer le processus
-        results = amc.full_correction_process(
-            scoring_strategy=scoring_strategy,
-            auto_optimize=auto_optimize
-        )
-        
-        # Calculer le statut global
-        success_count = sum(1 for _, result in results if result.get('success', False))
-        total_steps = len(results)
-        overall_success = success_count == total_steps
-        
-        return jsonify({
-            'success': overall_success,
-            'results': [
-                {
-                    'step': step,
-                    'success': result.get('success', False),
-                    'message': result.get('stdout', result.get('info', '')),
-                    'error': result.get('stderr', result.get('error', ''))
-                }
-                for step, result in results
-            ],
-            'statistics': amc.generate_advanced_statistics() if overall_success else None
-        })
-    
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+def start_correction_api(project_id):
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    manager = AMCManager(project_path)
 
+    # Récupérer les paramètres de la requête POST (peut être vide pour les valeurs par défaut)
+    data = request.get_json(silent=True) or {}
+    scoring_strategy = data.get('scoring_strategy', 'adaptative') # Valeur par défaut
+    auto_optimize = data.get('auto_optimize', True) # Valeur par défaut
+    generate_reports = data.get('generate_reports', True) # Valeur par défaut
+    # threshold = data.get('threshold', None) # Cette ligne est commentée car full_correction_process ne prend pas threshold directement
+
+    app.logger.info(f"Début du processus de correction complet pour le projet {project_id} avec stratégie {scoring_strategy}, auto-optimisation {auto_optimize}, rapports {generate_reports}")
+
+    try:
+        # Appeler la méthode full_correction_process du gestionnaire
+        results_raw = manager.full_correction_process(
+            scoring_strategy=scoring_strategy,
+            auto_optimize=auto_optimize,
+            generate_reports=generate_reports
+        )
+
+        # Convertir les objets Path en string pour la sérialisation JSON
+        results_for_json = convert_paths_to_strings(results_raw)
+
+        # Vérifier si toutes les étapes réussissent
+        # Note: La vérification 'isinstance(res, dict) and 'success' in res' est cruciale
+        # car 'results' peut contenir des tuples ('step_name', result_dict)
+        if all(res['success'] for _, res in results_raw if isinstance(res, dict) and 'success' in res):
+            app.logger.info(f"Correction complète terminée avec succès pour le projet {project_id}.")
+            return jsonify({'success': True, 'message': 'Correction terminée', 'results': results_for_json})
+        else:
+            # Trouver la première étape qui a échoué pour un message d'erreur plus précis
+            first_failure = next(((step, res) for step, res in results_raw if isinstance(res, dict) and 'success' in res and not res['success']), None)
+            error_message = f"La correction a échoué à l'étape '{first_failure[0]}': {first_failure[1].get('error', 'Erreur inconnue')}" if first_failure else "La correction a échoué."
+            app.logger.error(f"Correction échouée pour le projet {project_id}: {error_message}")
+            return jsonify({'success': False, 'error': error_message, 'results': results_for_json}), 500
+    except Exception as e:
+        app.logger.exception(f"Erreur interne lors de la correction du projet {project_id}: {e}")
+        return jsonify({'success': False, 'error': f"Erreur interne du serveur: {str(e)}"}), 500
+
+    
 @app.route('/api/correction/quality/<project_id>')
 def api_correction_quality(project_id):
     """API pour vérifier la qualité de la correction"""
@@ -833,54 +790,7 @@ def api_correction_preview(project_id):
             'error': str(e)
         }), 500
 
-@app.route('/download_results/<project_id>/<format>')
-def download_results(project_id, format):
-    """Télécharger les résultats dans différents formats"""
-    try:
-        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
-        exports_path = os.path.join(project_path, 'exports')
-        
-        if format == 'csv':
-            file_path = os.path.join(exports_path, 'notes.csv')
-            if os.path.exists(file_path):
-                return send_file(file_path, as_attachment=True, 
-                               download_name=f'notes_{project_id}.csv')
-        
-        elif format == 'ods':
-            file_path = os.path.join(exports_path, 'notes.ods')
-            if os.path.exists(file_path):
-                return send_file(file_path, as_attachment=True,
-                               download_name=f'notes_{project_id}.ods')
-        
-        elif format == 'statistics':
-            file_path = os.path.join(exports_path, 'statistics.json')
-            if os.path.exists(file_path):
-                return send_file(file_path, as_attachment=True,
-                               download_name=f'statistiques_{project_id}.json')
-        
-        elif format == 'annotated':
-            # Créer un ZIP avec toutes les copies annotées
-            annotated_dir = os.path.join(exports_path, 'annotated')
-            if os.path.exists(annotated_dir):
-                zip_path = os.path.join(exports_path, f'copies_annotees_{project_id}.zip')
-                
-                import zipfile
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for root, dirs, files in os.walk(annotated_dir):
-                        for file in files:
-                            file_path = os.path.join(root, file)
-                            arcname = os.path.relpath(file_path, annotated_dir)
-                            zipf.write(file_path, arcname)
-                
-                return send_file(zip_path, as_attachment=True,
-                               download_name=f'copies_annotees_{project_id}.zip')
-        
-        flash(f'Format {format} non disponible ou fichier non trouvé', 'error')
-        return redirect(url_for('project_detail', project_id=project_id))
-    
-    except Exception as e:
-        flash(f'Erreur téléchargement: {str(e)}', 'error')
-        return redirect(url_for('project_detail', project_id=project_id))
+
 
 @app.route('/reprocess/<project_id>')
 def reprocess_project(project_id):
@@ -1356,6 +1266,393 @@ def api_cleanup():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
+# amc_manager.py
+
+# ... (votre code existant pour AMCManager) ...
+
+    
+# ... (le reste de votre classe AMCManager) ...
+
+@app.route('/delete_project/<project_id>', methods=['DELETE', 'POST'])
+def delete_project(project_id):
+    """Supprimer un projet complet"""
+    try:
+        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+        
+        if not os.path.exists(project_path):
+            return jsonify({'success': False, 'error': 'Projet non trouvé'}), 404
+        
+        # Supprimer complètement le dossier du projet
+        shutil.rmtree(project_path)
+        
+        return jsonify({'success': True, 'message': f'Projet {project_id} supprimé avec succès'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Erreur lors de la suppression: {str(e)}'}), 500
+    
+
+# Ajoutez ces routes à votre app.py
+
+@app.route('/api/update-pages/<project_id>', methods=['POST'])
+def update_pages_setting(project_id):
+    """API pour mettre à jour le nombre de pages"""
+    try:
+        project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+        data = request.get_json()
+        num_pages = data.get('num_pages', 2)
+        
+        # Charger la configuration existante
+        config_file = os.path.join(project_path, 'qcm_config.json')
+        config = {}
+        if os.path.exists(config_file):
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        
+        # Mettre à jour le nombre de pages
+        config['num_pages'] = num_pages
+        
+        # Sauvegarder
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        
+        # Régénérer le fichier LaTeX si les questions existent
+        if config.get('questions'):
+            try:
+                amc = AMCManager(project_path)
+                amc.create_complete_questionnaire(
+                    config['questions'],
+                    title=config.get('title', 'QCM'),
+                    subject=config.get('subject', ''),
+                    duration=config.get('duration', '60 minutes'),
+                    num_pages=num_pages
+                )
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'Erreur génération LaTeX: {str(e)}'
+                }), 500
+        
+        return jsonify({
+            'success': True,
+            'message': f'Nombre de pages mis à jour: {num_pages}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Erreur: {str(e)}'
+        }), 500
+
+# Modifiez aussi la route project_detail pour passer current_pages :
+
+@app.route('/project/<project_id>')
+def project_detail(project_id):
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    info_file = os.path.join(project_path, 'project_info.json')
+
+    if not os.path.exists(info_file):
+        flash('Projet non trouvé', 'error')
+        return redirect(url_for('list_projects'))
+
+    with open(info_file, 'r') as f:
+        project_info = json.load(f)
+
+    # Vérifier les fichiers uploadés
+    uploads_path = os.path.join(project_path, 'uploads')
+    uploaded_files = []
+    if os.path.exists(uploads_path):
+        uploaded_files = os.listdir(uploads_path)
+
+    # Vérifier si un PDF existe
+    pdf_exists = False
+    # AJOUTEZ 'DOC-sujet.pdf' à cette liste
+    for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf', 'DOC-sujet.pdf']:
+        if os.path.exists(os.path.join(project_path, pdf_name)):
+            pdf_exists = True
+            break
+
+    # Vérifier si un LaTeX existe
+    latex_exists = os.path.exists(os.path.join(project_path, 'questionnaire.tex'))
+
+    # NOUVEAU : Récupérer le nombre de pages actuellement configuré
+    current_pages = 2  # Valeur par défaut
+    config_file = os.path.join(project_path, 'qcm_config.json')
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                current_pages = config.get('num_pages', 2)
+        except:
+            pass
+
+    return render_template('project_detail.html',
+                           project=project_info,
+                           project_id=project_id,
+                           uploaded_files=uploaded_files,
+                           pdf_exists=pdf_exists,
+                           latex_exists=latex_exists,
+                           current_pages=current_pages)
+
+@app.route('/configure/<project_id>', methods=['GET', 'POST'])
+def configure_project(project_id):
+    project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
+    info_file = os.path.join(project_path, 'project_info.json')
+    
+    if not os.path.exists(info_file):
+        flash('Projet non trouvé', 'error')
+        return redirect(url_for('list_projects'))
+    
+    with open(info_file, 'r') as f:
+        project_info = json.load(f)
+    
+    if request.method == 'POST':
+        # Récupérer les paramètres généraux
+        title = request.form.get('title', 'QCM')
+        subject = request.form.get('subject', '')
+        duration = request.form.get('duration', '60 minutes')
+        num_pages = int(request.form.get('num_pages', 2))
+        
+        # CORRECTION : Récupérer les questions du formulaire
+        questions_data = []
+        question_count = int(request.form.get('question_count', 0))
+        
+        print(f"DEBUG: Traitement de {question_count} questions")  # Debug
+        
+        for i in range(question_count):
+            question_text = request.form.get(f'question_{i}_text', '').strip()
+            if question_text:
+                question = {
+                    'id': f'q{i+1}',
+                    'text': question_text,
+                    'choices': []
+                }
+                
+                # Récupérer les choix pour cette question
+                choice_count = int(request.form.get(f'question_{i}_choice_count', 0))
+                print(f"DEBUG: Question {i+1}: {choice_count} choix")  # Debug
+                
+                for j in range(choice_count):
+                    choice_text = request.form.get(f'question_{i}_choice_{j}_text', '').strip()
+                    is_correct = request.form.get(f'question_{i}_choice_{j}_correct') is not None
+                    
+                    if choice_text:
+                        question['choices'].append({
+                            'text': choice_text,
+                            'correct': is_correct
+                        })
+                
+                # Ajouter la question seulement si elle a des choix
+                if question['choices']:
+                    questions_data.append(question)
+                    print(f"DEBUG: Question ajoutée: {question['text'][:50]}...")  # Debug
+        
+        print(f"DEBUG: Total questions valides: {len(questions_data)}")  # Debug
+        
+        # Sauvegarder la configuration dans un fichier JSON
+        config_file = os.path.join(project_path, 'qcm_config.json')
+        config = {
+            'title': title,
+            'subject': subject,
+            'duration': duration,
+            'num_pages': num_pages,
+            'questions': questions_data
+        }
+        
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        
+        print(f"DEBUG: Configuration sauvegardée dans {config_file}")  # Debug
+        
+        # Créer le fichier LaTeX avec AMCManager
+        try:
+            amc = AMCManager(project_path)
+            latex_file = amc.create_complete_questionnaire(
+                questions_data, 
+                title=title, 
+                subject=subject, 
+                duration=duration,
+                num_pages=num_pages
+            )
+            flash(f'Configuration sauvegardée! QCM avec {len(questions_data)} questions sur {num_pages} page(s)', 'success')
+            print(f"DEBUG: LaTeX créé: {latex_file}")  # Debug
+        except Exception as e:
+            flash(f'Erreur lors de la création du LaTeX: {str(e)}', 'error')
+            print(f"DEBUG: Erreur LaTeX: {e}")  # Debug
+        
+        return redirect(url_for('project_detail', project_id=project_id))
+    
+    # GET: Charger la configuration existante
+    existing_config = {
+        'title': 'QCM',
+        'subject': '',
+        'duration': '60 minutes',
+        'num_pages': 2,
+        'questions': []
+    }
+    
+    # Charger la configuration existante
+    config_file = os.path.join(project_path, 'qcm_config.json')
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                saved_config = json.load(f)
+                existing_config.update(saved_config)
+                print(f"DEBUG: Configuration chargée avec {len(existing_config.get('questions', []))} questions")  # Debug
+        except Exception as e:
+            print(f"DEBUG: Erreur chargement config: {e}")  # Debug
+    
+    return render_template('configure_qcm.html', 
+                         project=project_info, 
+                         project_id=project_id,
+                         existing_config=existing_config,
+                         sample_questions=SAMPLE_QUESTIONS,
+                         scoring_strategies=SCORING_STRATEGIES)
+
+# Ajoutez cette route dans votre app.py
+
+@app.route('/download_results/<project_id>')
+def download_results(project_id):
+    """Télécharger le fichier de résultats CSV"""
+    try:
+        project_path = Path('amc-projects') / project_id
+        if not project_path.exists():
+            flash(f'Projet {project_id} non trouvé', 'error')
+            return redirect(url_for('index'))
+        
+        # Chercher le fichier notes.csv
+        csv_file = project_path / 'exports' / 'notes.csv'
+        
+        if not csv_file.exists():
+            flash('Fichier de résultats non trouvé. Effectuez d\'abord la correction.', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))
+        
+        # Vérifier que le fichier n'est pas vide
+        if csv_file.stat().st_size == 0:
+            flash('Le fichier de résultats est vide.', 'error')
+            return redirect(url_for('project_detail', project_id=project_id))
+        
+        app.logger.info(f"Téléchargement du CSV: {csv_file} -> notes_{project_id}.csv")
+        
+        return send_file(
+            csv_file,
+            as_attachment=True,
+            download_name=f'notes_{project_id}.csv',
+            mimetype='text/csv'
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Erreur téléchargement CSV pour {project_id}: {e}")
+        flash(f'Erreur lors du téléchargement: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))
+
+@app.route('/download_annotated/<project_id>')
+def download_annotated(project_id):
+    """Télécharger les copies annotées en ZIP"""
+    try:
+        project_path = PROJECTS_DIR / project_id
+        if not project_path.exists():
+            flash(f'Projet {project_id} non trouvé', 'error')
+            return redirect(url_for('index'))
+        
+        # Dossier des copies annotées
+        annotated_dir = project_path / 'exports' / 'annotated'
+        
+        if not annotated_dir.exists() or not any(annotated_dir.iterdir()):
+            flash('Copies annotées non trouvées. Effectuez d\'abord la correction.', 'error')
+            return redirect(url_for('project_details', project_id=project_id))
+        
+        # Créer un fichier ZIP temporaire
+        import zipfile
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_zip:
+            with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for file_path in annotated_dir.rglob('*'):
+                    if file_path.is_file():
+                        # Nom relatif dans le ZIP
+                        arcname = file_path.relative_to(annotated_dir)
+                        zf.write(file_path, arcname)
+            
+            app.logger.info(f"Téléchargement des copies annotées: {temp_zip.name} -> copies_annotees_{project_id}.zip")
+            
+            def remove_file(response):
+                try:
+                    os.unlink(temp_zip.name)
+                except Exception:
+                    pass
+                return response
+            
+            return send_file(
+                temp_zip.name,
+                as_attachment=True,
+                download_name=f'copies_annotees_{project_id}.zip',
+                mimetype='application/zip'
+            )
+        
+    except Exception as e:
+        app.logger.error(f"Erreur téléchargement copies annotées pour {project_id}: {e}")
+        flash(f'Erreur lors du téléchargement: {str(e)}', 'error')
+        return redirect(url_for('project_details', project_id=project_id))
+
+@app.route('/view_results/<project_id>')  
+def view_results(project_id):
+    """Afficher les résultats de correction avec statistiques"""
+    try:
+        # Utiliser le même chemin que dans vos autres routes
+        project_path = Path('amc-projects') / project_id  # ou la variable que vous utilisez
+        if not project_path.exists():
+            flash(f'Projet {project_id} non trouvé', 'error')
+            return redirect(url_for('index'))
+        
+        # Chercher le fichier notes.csv
+        csv_file = project_path / 'exports' / 'notes.csv'
+        
+        results_data = []
+        stats = {}
+        
+        if csv_file.exists():
+            try:
+                import csv as csv_module
+                with open(csv_file, 'r', encoding='utf-8') as f:
+                    reader = csv_module.DictReader(f)
+                    results_data = list(reader)
+                
+                # Calculer les statistiques
+                if results_data:
+                    notes = []
+                    for row in results_data:
+                        try:
+                            if 'Note' in row and row['Note']:
+                                note = float(row['Note'])
+                                notes.append(note)
+                        except (ValueError, TypeError):
+                            continue
+                    
+                    if notes:
+                        stats = {
+                            'total_students': len(results_data),
+                            'average': round(sum(notes) / len(notes), 2),
+                            'min_score': min(notes),
+                            'max_score': max(notes),
+                            'passed': len([n for n in notes if n >= 10])
+                        }
+                        
+            except Exception as e:
+                app.logger.error(f"Erreur lecture CSV: {e}")
+                flash('Erreur lors de la lecture des résultats.', 'error')
+        
+        return render_template('results.html', 
+                             project_id=project_id, 
+                             results=results_data[:50] if results_data else [],  # Limit to first 50
+                             stats=stats,
+                             total_results=len(results_data))
+        
+    except Exception as e:
+        app.logger.error(f"Erreur affichage résultats pour {project_id}: {e}")
+        flash(f'Erreur lors de l\'affichage: {str(e)}', 'error')
+        return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
+
+
 @app.route('/help')
 def help_page():
     return render_template('index.html')

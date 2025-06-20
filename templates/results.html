@@ -11,49 +11,140 @@
             <h1>📊 Résultats de correction</h1>
             <p>Projet: {{ project_id }}</p>
         </div>
-        <button onclick="window.close()" class="btn btn-secondary">Fermer</button>
+        <button onclick="window.history.back()" class="btn btn-secondary">← Retour</button>
     </div>
 </div>
 
-{% if results %}
+<!-- Statistiques générales -->
+{% if stats %}
 <div class="card">
-    <h2>📁 Fichiers de résultats générés</h2>
+    <h2>📈 Statistiques générales</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
+        <div style="text-align: center; padding: 1rem; background: #e3f2fd; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #1976d2;">{{ stats.total_students }}</div>
+            <div style="color: #666;">Étudiants</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #f3e5f5; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #7b1fa2;">{{ stats.average }}/20</div>
+            <div style="color: #666;">Moyenne</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #ffebee; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #c62828;">{{ stats.min_score }}</div>
+            <div style="color: #666;">Note min</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #e8f5e8; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #2e7d32;">{{ stats.max_score }}</div>
+            <div style="color: #666;">Note max</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #fff3e0; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #ef6c00;">{{ stats.passed }}</div>
+            <div style="color: #666;">Admis (≥10)</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: #f1f8e9; border-radius: 5px;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: #558b2f;">{{ ((stats.passed / stats.total_students * 100) | round(1)) }}%</div>
+            <div style="color: #666;">Taux réussite</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Téléchargements -->
+<div class="card">
+    <h2>📁 Téléchargements</h2>
     <div style="display: grid; gap: 1rem; margin-top: 1rem;">
-        {% for file in results %}
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #e8f5e8; border-radius: 5px;">
             <div>
-                <strong>{{ file }}</strong>
+                <strong>📊 Notes CSV</strong>
                 <div style="color: #666; font-size: 0.9rem;">
-                    {% if file.endswith('.csv') %}
-                        📊 Fichier de notes CSV
-                    {% elif file.endswith('.pdf') %}
-                        📄 Rapport PDF
-                    {% else %}
-                        📁 Fichier de résultats
-                    {% endif %}
+                    Fichier CSV avec toutes les notes et détails par question
                 </div>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button onclick="downloadFile('{{ file }}')" class="btn">
-                    📥 Télécharger
-                </button>
-                {% if file.endswith('.csv') %}
-                <button onclick="previewCSV('{{ file }}')" class="btn btn-secondary">
-                    👁️ Aperçu
-                </button>
-                {% endif %}
-            </div>
+            <button onclick="downloadCSV()" class="btn" style="background: #4caf50; color: white;">
+                📥 Télécharger CSV
+            </button>
         </div>
-        {% endfor %}
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: #e3f2fd; border-radius: 5px;">
+            <div>
+                <strong>📄 Copies annotées</strong>
+                <div style="color: #666; font-size: 0.9rem;">
+                    Archive ZIP des copies corrigées avec annotations
+                </div>
+            </div>
+            <button onclick="downloadAnnotated()" class="btn" style="background: #2196f3; color: white;">
+                📥 Télécharger ZIP
+            </button>
+        </div>
     </div>
+</div>
+
+<!-- Aperçu des résultats -->
+{% if results %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>👁️ Aperçu des résultats</h2>
+        {% if total_results > 50 %}
+        <span style="color: #666; font-size: 0.9rem;">
+            Affichage de {{ results|length }}/{{ total_results }} résultats
+        </span>
+        {% endif %}
+    </div>
+    
+    <div style="margin-top: 1rem; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    {% for key in results[0].keys() %}
+                    <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">
+                        {{ key }}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results %}
+                <tr style="{% if loop.index % 2 == 0 %}background: #f8f9fa;{% endif %}">
+                    {% for key, value in row.items() %}
+                    <td style="padding: 0.75rem; border-bottom: 1px solid #dee2e6;">
+                        {% if key == 'Note' and value %}
+                            <span style="
+                                padding: 0.25rem 0.5rem; 
+                                border-radius: 3px; 
+                                color: white; 
+                                font-weight: bold;
+                                background: 
+                                {% if value|float >= 16 %}#4caf50
+                                {% elif value|float >= 14 %}#2196f3  
+                                {% elif value|float >= 10 %}#ff9800
+                                {% else %}#f44336
+                                {% endif %};
+                            ">
+                                {{ value }}
+                            </span>
+                        {% else %}
+                            {{ value or '-' }}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if total_results > 50 %}
+    <div style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-radius: 5px; color: #856404;">
+        ℹ️ Seuls les 50 premiers résultats sont affichés. Téléchargez le fichier CSV pour voir tous les résultats.
+    </div>
+    {% endif %}
 </div>
 {% else %}
 <div class="card">
     <div style="text-align: center; padding: 2rem;">
         <h2>Aucun résultat disponible</h2>
         <p>Le traitement n'a pas encore été effectué ou n'a pas généré de résultats.</p>
-        <button onclick="window.close()" class="btn">
-            Retourner au projet
+        <button onclick="window.history.back()" class="btn">
+            ← Retourner au projet
         </button>
     </div>
 </div>
@@ -62,12 +153,19 @@
 
 {% block scripts %}
 <script>
-function downloadFile(filename) {
-    alert(`Téléchargement de ${filename} (à implémenter)`);
+function downloadCSV() {
+    // Redirection vers la route de téléchargement CSV
+    window.location.href = `/download_results/{{ project_id }}`;
+}
+
+function downloadAnnotated() {
+    // Redirection vers la route de téléchargement des copies annotées
+    window.location.href = `/download_annotated/{{ project_id }}`;
 }
 
 function previewCSV(filename) {
-    alert('Aperçu CSV à implémenter');
+    // Optionnel: Ajouter un aperçu détaillé du CSV dans une modal
+    alert('Aperçu détaillé du CSV à implémenter si nécessaire');
 }
 </script>
 {% endblock %}

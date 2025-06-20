@@ -52,7 +52,25 @@
 <script>
 function deleteProject(projectId) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.')) {
-        alert('Fonctionnalité de suppression à implémenter');
+        fetch(`/delete_project/${projectId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Projet supprimé avec succès');
+                location.reload(); // Recharger la page pour voir les changements
+            } else {
+                alert('Erreur: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la suppression');
+        });
     }
 }
 </script>

@@ -1,6 +1,7 @@
-<!-- Template project_detail.html CORRIGÉ -->
+<!-- Template project_detail.html CORRIGÉ avec réglage nombre de pages -->
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 </head>
+
 <body>
     <div class="container mt-4">
         <div class="row">
@@ -34,25 +36,33 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <strong>Nom :</strong> {{ project.name }}
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <strong>Créé le :</strong> {{ project.created[:10] }}
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <strong>Statut :</strong>
                                         {% if pdf_exists %}
-                                            <span class="badge bg-success">Prêt</span>
+                                        <span class="badge bg-success">Prêt</span>
                                         {% else %}
-                                            <span class="badge bg-warning">En préparation</span>
+                                        <span class="badge bg-warning">En préparation</span>
                                         {% endif %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Pages par élève :</strong>
+                                        <span class="badge bg-info" id="current-pages-display">
+                                            {{ current_pages if current_pages else '2' }} page(s)
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+
 
                 <!-- Actions principales -->
                 <div class="row mb-4">
@@ -63,35 +73,74 @@
                             </div>
                             <div class="card-body">
                                 <div class="d-grid gap-2 d-md-flex">
-                                    <a href="{{ url_for('configure_project', project_id=project_id) }}" 
-                                       class="btn btn-outline-primary">
-                                        <i class="bi bi-pencil"></i> Configurer QCM
-                                    </a>
-                                    
-                                    {% if latex_exists %}
-                                        <a href="{{ url_for('preview_qcm', project_id=project_id) }}" 
-                                           class="btn btn-outline-info" target="_blank">
-                                            <i class="bi bi-eye"></i> Prévisualiser
-                                        </a>
-                                        <a href="{{ url_for('download_qcm', project_id=project_id) }}" 
-                                           class="btn btn-success">
-                                            <i class="bi bi-download"></i> Télécharger PDF
-                                        </a>
-                                    {% else %}
-                                        <button class="btn btn-outline-secondary" disabled>
-                                            <i class="bi bi-exclamation-triangle"></i> Configurer d'abord le QCM
-                                        </button>
-                                    {% endif %}
-                                    
-                                    <a href="{{ url_for('manage_students', project_id=project_id) }}" 
-                                       class="btn btn-outline-warning">
+                                    <a href="{{ url_for('manage_students', project_id=project_id) }}"
+                                        class="btn btn-outline-warning">
                                         <i class="bi bi-people"></i> Gérer élèves
                                     </a>
+                                    <a href="{{ url_for('configure_project', project_id=project_id) }}"
+                                        class="btn btn-outline-primary">
+                                        <i class="bi bi-pencil"></i> Configurer QCM
+                                    </a>
+
+                                    {% if latex_exists %}
+                                    <a href="{{ url_for('preview_qcm', project_id=project_id) }}"
+                                        class="btn btn-outline-info" target="_blank">
+                                        <i class="bi bi-eye"></i> Prévisualiser
+                                    </a>
+                                    <a href="{{ url_for('download_qcm', project_id=project_id) }}"
+                                        class="btn btn-success">
+                                        <i class="bi bi-download"></i> Télécharger PDF
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-outline-secondary" disabled>
+                                        <i class="bi bi-exclamation-triangle"></i> Configurer d'abord le QCM
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <!-- NOUVELLE SECTION : Réglages rapides -->
+                <div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-sliders"></i> Réglages rapides</h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="quick-pages-select" class="form-label">
+                            <i class="bi bi-file-earmark-text"></i> Nombre de pages par élève :
+                        </label>
+                        <select id="quick-pages-select" class="form-select">
+                            <option value="1" {{ "selected" if current_pages==1 else "" }}>1 page (recto)</option>
+                            <option value="2" {{ "selected" if current_pages==2 or not current_pages else "" }}>2 pages (recto-verso)</option>
+                            <option value="3" {{ "selected" if current_pages==3 else "" }}>3 pages</option>
+                            <option value="4" {{ "selected" if current_pages==4 else "" }}>4 pages</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Actions :</label><br>
+                        <button class="btn btn-primary" onclick="applyPagesSettings(this)">
+                            <i class="bi bi-check2"></i> Appliquer
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" onclick="regeneratePDF()">
+                            <i class="bi bi-arrow-clockwise"></i> Régénérer PDF
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="alert alert-info mb-0 small">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Info :</strong> Modifiez le nombre de pages puis cliquez sur "Appliquer" pour sauvegarder et régénérer le PDF.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                 <!-- Upload de fichiers -->
                 <div class="row mb-4">
@@ -103,8 +152,8 @@
                             <div class="card-body">
                                 <form id="upload-form" enctype="multipart/form-data">
                                     <div class="mb-3">
-                                        <input class="form-control" type="file" id="file-input" 
-                                               accept=".pdf,.jpg,.jpeg,.png,.tiff" multiple>
+                                        <input class="form-control" type="file" id="file-input"
+                                            accept=".pdf,.jpg,.jpeg,.png,.tiff" multiple>
                                     </div>
                                     <button type="submit" class="btn btn-primary">
                                         <i class="bi bi-upload"></i> Uploader
@@ -118,8 +167,8 @@
                                         {% for file in uploaded_files %}
                                         <div class="list-group-item d-flex justify-content-between align-items-center">
                                             <span><i class="bi bi-file-earmark"></i> {{ file }}</span>
-                                            <button class="btn btn-sm btn-outline-danger" 
-                                                    onclick="deleteFile('{{ file }}')">
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                onclick="deleteFile('{{ file }}')">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
@@ -150,20 +199,20 @@
                                         <div class="d-flex align-items-center gap-3">
                                             <div class="d-flex align-items-center">
                                                 {% if latex_exists %}
-                                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
-                                                    <span>Questionnaire</span>
+                                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                <span>Questionnaire</span>
                                                 {% else %}
-                                                    <i class="bi bi-x-circle-fill text-danger me-1"></i>
-                                                    <span class="text-muted">Questionnaire</span>
+                                                <i class="bi bi-x-circle-fill text-danger me-1"></i>
+                                                <span class="text-muted">Questionnaire</span>
                                                 {% endif %}
                                             </div>
                                             <div class="d-flex align-items-center">
                                                 {% if pdf_exists %}
-                                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
-                                                    <span>PDF généré</span>
+                                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                <span>PDF généré</span>
                                                 {% else %}
-                                                    <i class="bi bi-x-circle-fill text-danger me-1"></i>
-                                                    <span class="text-muted">PDF généré</span>
+                                                <i class="bi bi-x-circle-fill text-danger me-1"></i>
+                                                <span class="text-muted">PDF généré</span>
                                                 {% endif %}
                                             </div>
                                             <div class="d-flex align-items-center">
@@ -180,8 +229,8 @@
                                         <h6>Actions rapides :</h6>
                                         <div class="d-grid gap-2">
                                             {% if latex_exists and pdf_exists %}
-                                            <a href="{{ url_for('process_project', project_id=project_id) }}" 
-                                               class="btn btn-primary">
+                                            <a href="{{ url_for('process_project', project_id=project_id) }}"
+                                                class="btn btn-primary">
                                                 <i class="bi bi-play-fill"></i> Démarrer Correction
                                             </a>
                                             {% else %}
@@ -189,13 +238,13 @@
                                                 <i class="bi bi-exclamation-triangle"></i> Projet non prêt
                                             </button>
                                             {% endif %}
-                                            
+
                                             <button class="btn btn-outline-info" onclick="quickScanCheck()">
                                                 <i class="bi bi-search"></i> Vérifier qualité scans
                                             </button>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <h6>Correction express :</h6>
                                         <p class="text-muted small">
@@ -223,8 +272,8 @@
                                             <span id="status-text">Préparation de la correction...</span>
                                         </div>
                                         <div class="progress mt-2">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 id="correction-progress" style="width: 0%"></div>
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                id="correction-progress" style="width: 0%"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -242,11 +291,11 @@
                                 <h5><i class="bi bi-bar-chart"></i> Résultats et Rapports</h5>
                             </div>
                             <div class="card-body">
-                                <a href="{{ url_for('view_results', project_id=project_id) }}" 
-                                   class="btn btn-outline-success">
+                                <a href="{{ url_for('view_results', project_id=project_id) }}"
+                                    class="btn btn-outline-success">
                                     <i class="bi bi-eye"></i> Voir les résultats
                                 </a>
-                                
+
                                 <button class="btn btn-outline-info" onclick="showProcessLog()">
                                     <i class="bi bi-journal-text"></i> Journal de traitement
                                 </button>
@@ -290,6 +339,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+
         // Upload de fichiers
         document.getElementById('upload-form').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -345,6 +395,163 @@
                 });
             }
         }
+        // NOUVELLES FONCTIONS pour gérer les réglages de pages
+        // CORRECTION des fonctions pour gérer les réglages de pages
+
+        function regeneratePDFDirect() {
+    showToast('info', 'Régénération du PDF en cours...');
+
+    fetch(`/generate_pdf/{{ project_id }}`)
+        .then(response => {
+            if (response.ok) {
+                showToast('success', 'PDF régénéré avec succès');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('danger', 'Erreur lors de la régénération du PDF');
+            }
+        })
+        .catch(error => {
+            showToast('danger', 'Erreur: ' + error);
+        });
+}
+
+        function applyPagesSettings(buttonElement) {
+            const selectedPages = document.getElementById('quick-pages-select').value;
+
+            // Utiliser le bouton passé en paramètre
+            const button = buttonElement;
+            const originalText = button.innerHTML;
+
+            button.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Application...';
+            button.disabled = true;
+
+            // Envoyer la mise à jour au serveur
+            fetch(`/api/update-pages/{{ project_id }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    num_pages: parseInt(selectedPages)
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Mettre à jour l'affichage
+                        document.getElementById('current-pages-display').textContent = selectedPages + ' page(s)';
+                        showToast('success', `Configuration mise à jour: ${selectedPages} page(s) par élève`);
+
+                        // Proposer de régénérer le PDF automatiquement
+                        if (confirm('Voulez-vous régénérer le PDF avec ces nouveaux paramètres ?')) {
+                            // Appeler directement la régénération sans passer par le bouton
+                            regeneratePDFDirect();
+                        }
+                    } else {
+                        showToast('danger', 'Erreur: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    showToast('danger', 'Erreur de communication: ' + error);
+                })
+                .finally(() => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                });
+        }
+
+function regeneratePDF() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+
+    button.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Génération...';
+    button.disabled = true;
+
+    fetch(`/generate_pdf/{{ project_id }}`)
+        .then(response => {
+            if (response.ok) {
+                showToast('success', 'PDF régénéré avec succès');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast('danger', 'Erreur lors de la régénération du PDF');
+            }
+        })
+        .catch(error => {
+            showToast('danger', 'Erreur: ' + error);
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+}
+        function triggerRegeneratePDF() {
+            const button = event.target;
+            regeneratePDF(button);
+        }
+
+        function regeneratePDF(button) {
+            // Si le bouton n'est pas passé en paramètre, le récupérer depuis l'événement
+            if (!button && event && event.target) {
+                button = event.target;
+            } else if (!button) {
+                // Si pas d'événement, chercher le bouton dans le DOM
+                button = document.querySelector('button[onclick*="regeneratePDF"]');
+            }
+
+            if (!button) {
+                showToast('danger', 'Erreur: bouton non trouvé');
+                return;
+            }
+
+            const originalText = button.innerHTML;
+
+            button.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Génération...';
+            button.disabled = true;
+
+            fetch(`/generate_pdf/{{ project_id }}`)
+                .then(response => {
+                    if (response.ok) {
+                        showToast('success', 'PDF régénéré avec succès');
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        showToast('danger', 'Erreur lors de la régénération du PDF');
+                    }
+                })
+                .catch(error => {
+                    showToast('danger', 'Erreur: ' + error);
+                })
+                .finally(() => {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                });
+        }
+
+        // Fonction alternative pour régénérer le PDF (appelée depuis le HTML)
+        function triggerRegeneratePDF() {
+            const button = event.target;
+            regeneratePDF(button);
+        }
+
+        // Suppression de fichier
+        function deleteFile(filename) {
+            if (confirm('Supprimer ce fichier ?')) {
+                fetch(`/delete/{{ project_id }}/${filename}`, {
+                    method: 'DELETE'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast('success', 'Fichier supprimé');
+                            setTimeout(() => window.location.reload(), 1000);
+                        } else {
+                            showToast('danger', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        showToast('danger', 'Erreur suppression: ' + error);
+                    });
+            }
+        }
 
         // Vérification rapide de la qualité des scans
         function quickScanCheck() {
@@ -370,15 +577,45 @@
         function startExpressCorrection() {
             // Fermer le modal
             bootstrap.Modal.getInstance(document.getElementById('express-modal')).hide();
-            
-            // Afficher le statut
+
+            // Afficher le statut de correction
             document.getElementById('correction-status').style.display = 'block';
-            updateCorrectionStatus('Initialisation de la correction...', 10);
-            
-            // Rediriger vers le processus de correction
-            setTimeout(() => {
-                window.location.href = `/process/{{ project_id }}`;
-            }, 1000);
+            updateCorrectionStatus('Démarrage de la correction automatique...', 10);
+
+            const projectId = "{{ project_id }}";
+
+            fetch(`/api/correction/start/${projectId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    scoring_strategy: 'adaptative',
+                    auto_optimize: true,
+                    generate_reports: true,
+                    threshold: null
+                })
+            })
+                .then(response => {
+                    updateCorrectionStatus('Analyse des copies en cours...', 40);
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        updateCorrectionStatus('Correction terminée avec succès !', 100, 'success');
+                        showToast('success', data.message);
+                        setTimeout(() => window.location.reload(), 2000);
+                    } else {
+                        updateCorrectionStatus(`Erreur: ${data.error}`, 100, 'danger');
+                        showToast('danger', `Correction échouée: ${data.error}`);
+                        console.error('Détails de l\'erreur de correction:', data.results);
+                    }
+                })
+                .catch(error => {
+                    updateCorrectionStatus('Erreur de communication avec le serveur.', 100, 'danger');
+                    showToast('danger', 'Erreur lors du démarrage de la correction: ' + error);
+                    console.error('Erreur réseau ou serveur:', error);
+                });
         }
 
         function updateCorrectionStatus(text, progress, type = 'info') {
@@ -387,14 +624,13 @@
         }
 
         function showProcessLog() {
-            // TODO: Implémenter l'affichage du journal
             showToast('info', 'Journal de traitement - Fonctionnalité à venir');
         }
 
         // Fonction utilitaire pour afficher des notifications
         function showToast(type, message, duration = 3000) {
             const toastContainer = document.getElementById('toast-container') || createToastContainer();
-            
+
             const toastId = 'toast-' + Date.now();
             const toast = document.createElement('div');
             toast.className = `toast align-items-center text-white bg-${type} border-0`;
@@ -406,14 +642,14 @@
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                 </div>
             `;
-            
+
             toastContainer.appendChild(toast);
-            
+
             const bsToast = new bootstrap.Toast(toast, {
                 delay: duration
             });
             bsToast.show();
-            
+
             toast.addEventListener('hidden.bs.toast', () => {
                 toast.remove();
             });
@@ -433,15 +669,21 @@
         .spin {
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
-        
+
         .toast-container {
             z-index: 1055;
         }
     </style>
 </body>
+
 </html>

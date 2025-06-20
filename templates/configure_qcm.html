@@ -31,6 +31,44 @@
 <form method="POST" id="qcmForm">
     <input type="hidden" id="questionCount" name="question_count" value="0">
     
+    <!-- NOUVEAU : Section informations générales -->
+    <div class="card">
+        <h2>📋 Informations générales</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="title">Titre du QCM *</label>
+                    <input type="text" id="title" name="title" value="{{ existing_config.title if existing_config else 'QCM' }}" required class="form-control">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="subject">Matière/Sujet</label>
+                    <input type="text" id="subject" name="subject" value="{{ existing_config.subject if existing_config else '' }}" placeholder="Ex: Mathématiques, Histoire..." class="form-control">
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="duration">Durée</label>
+                    <input type="text" id="duration" name="duration" value="{{ existing_config.duration if existing_config else '60 minutes' }}" placeholder="Ex: 60 minutes" class="form-control">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="num_pages">Nombre de pages par élève</label>
+                    <select id="num_pages" name="num_pages" class="form-control">
+                        <option value="1" {{ "selected" if existing_config.num_pages == 1 else "" }}>1 page (recto)</option>
+                        <option value="2" {{ "selected" if existing_config.num_pages == 2 or not existing_config.num_pages else "" }}>2 pages (recto-verso)</option>
+                        <option value="3" {{ "selected" if existing_config.num_pages == 3 else "" }}>3 pages</option>
+                        <option value="4" {{ "selected" if existing_config.num_pages == 4 else "" }}>4 pages</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="card">
         <h2>❓ Questions</h2>
         <div id="questionsContainer">
@@ -48,7 +86,7 @@
         <h2>⚙️ Configuration de notation</h2>
         <div class="form-group">
             <label for="scoring_strategy">Stratégie de notation</label>
-            <select id="scoring_strategy" name="scoring_strategy">
+            <select id="scoring_strategy" name="scoring_strategy" class="form-control">
                 <option value="default">Standard - Bonne: +1, Mauvaise: 0, Vide: 0</option>
                 <option value="negative">Avec pénalité - Bonne: +1, Mauvaise: -0.5, Vide: 0</option>
                 <option value="strict">Strict - Bonne: +1, Mauvaise: -1, Vide: 0</option>
@@ -58,11 +96,16 @@
     
     <div class="card">
         <div style="display: flex; gap: 1rem; justify-content: center;">
-            <button type="submit" class="btn">💾 Sauvegarder la configuration</button>
-            <button type="button" onclick="alert('Aperçu LaTeX à implémenter')" class="btn btn-secondary">👁️ Aperçu LaTeX</button>
+            <button type="submit" class="btn btn-primary">💾 Sauvegarder la configuration</button>
+            <button type="button" onclick="previewLatex()" class="btn btn-secondary">👁️ Aperçu LaTeX</button>
         </div>
     </div>
 </form>
+
+<!-- Zone de statut -->
+<div id="statusAlert" style="display: none;" class="alert mt-3">
+    <div id="statusMessage"></div>
+</div>
 
 <style>
 .question-block {
@@ -82,6 +125,44 @@
     background: white;
     border-radius: 5px;
 }
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -15px;
+    margin-left: -15px;
+}
+
+.col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+@media (max-width: 768px) {
+    .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
 </style>
 {% endblock %}
 
@@ -89,11 +170,24 @@
 <script>
 let questionCounter = 0;
 
-// Charger la configuration existante si elle existe
-const existingConfig = {{ existing_config | tojson if existing_config else '[]' }};
-if (existingConfig.length > 0) {
+// CORRECTION : Charger la configuration existante
+const existingConfig = {{ existing_config | tojson if existing_config else '{}' }};
+
+// Charger les questions au démarrage si elles existent
+if (existingConfig && existingConfig.questions && existingConfig.questions.length > 0) {
     document.addEventListener('DOMContentLoaded', function() {
-        loadConfiguration(existingConfig);
+        console.log('Chargement de', existingConfig.questions.length, 'questions existantes');
+        
+        // Vider le conteneur
+        document.getElementById('questionsContainer').innerHTML = '';
+        questionCounter = 0;
+        
+        // Charger chaque question
+        existingConfig.questions.forEach(question => {
+            addQuestion(question);
+        });
+        
+        showStatus('Configuration existante chargée avec ' + existingConfig.questions.length + ' questions', 'info');
     });
 }
 
@@ -113,7 +207,7 @@ function addQuestion(questionData = null) {
         
         <div class="form-group">
             <label>Texte de la question *</label>
-            <textarea name="question_${questionIndex}_text" rows="2" placeholder="Saisissez votre question..." required>${questionData ? questionData.text : ''}</textarea>
+            <textarea name="question_${questionIndex}_text" rows="2" placeholder="Saisissez votre question..." required class="form-control">${questionData ? questionData.text : ''}</textarea>
         </div>
         
         <div>
@@ -133,6 +227,7 @@ function addQuestion(questionData = null) {
             addChoice(questionIndex, choice);
         });
     } else {
+        // Ajouter 4 choix par défaut
         for (let i = 0; i < 4; i++) {
             addChoice(questionIndex);
         }
@@ -146,6 +241,7 @@ function removeQuestion(questionIndex) {
     if (questionDiv) {
         questionDiv.remove();
         updateQuestionCount();
+        showStatus('Question supprimée', 'warning');
     }
 }
 
@@ -164,7 +260,7 @@ function addChoice(questionIndex, choiceData = null) {
         <label for="correct_${questionIndex}_${choiceIndex}" style="margin: 0; color: #28a745; font-weight: bold;">✓</label>
         <input type="text" name="question_${questionIndex}_choice_${choiceIndex}_text" 
                placeholder="Choix de réponse..." style="flex: 1;" 
-               value="${choiceData ? choiceData.text : ''}" required>
+               value="${choiceData ? choiceData.text : ''}" required class="form-control">
         <button type="button" onclick="removeChoice(${questionIndex}, ${choiceIndex})" 
                 style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 8px; cursor: pointer;">✕</button>
     `;
@@ -209,21 +305,24 @@ function loadSampleQCM() {
                     {text: '5', correct: false},
                     {text: '6', correct: false}
                 ]
+            },
+            {
+                text: 'Quel est le plus grand océan du monde ?',
+                choices: [
+                    {text: 'Océan Atlantique', correct: false},
+                    {text: 'Océan Pacifique', correct: true},
+                    {text: 'Océan Indien', correct: false},
+                    {text: 'Océan Arctique', correct: false}
+                ]
             }
         ];
         
         sampleQuestions.forEach(question => {
             addQuestion(question);
         });
+        
+        showStatus('QCM d\'exemple chargé avec ' + sampleQuestions.length + ' questions', 'success');
     }
-}
-
-function loadConfiguration(config) {
-    document.getElementById('questionsContainer').innerHTML = '';
-    questionCounter = 0;
-    config.forEach(question => {
-        addQuestion(question);
-    });
 }
 
 function clearAll() {
@@ -231,7 +330,75 @@ function clearAll() {
         document.getElementById('questionsContainer').innerHTML = '';
         questionCounter = 0;
         updateQuestionCount();
+        showStatus('Toutes les questions ont été supprimées', 'warning');
     }
 }
+
+function previewLatex() {
+    const questionCount = parseInt(document.getElementById('questionCount').value);
+    if (questionCount === 0) {
+        alert('Veuillez ajouter au moins une question pour prévisualiser');
+        return;
+    }
+    
+    showStatus('Fonctionnalité de prévisualisation LaTeX à venir', 'info');
+}
+
+function showStatus(message, type = 'info') {
+    const statusAlert = document.getElementById('statusAlert');
+    const statusMessage = document.getElementById('statusMessage');
+    
+    statusAlert.className = `alert alert-${type} mt-3`;
+    statusMessage.textContent = message;
+    statusAlert.style.display = 'block';
+    
+    // Masquer automatiquement après 5 secondes
+    setTimeout(() => {
+        statusAlert.style.display = 'none';
+    }, 5000);
+}
+
+// Validation et debug du formulaire
+document.getElementById('qcmForm').addEventListener('submit', function(e) {
+    console.log('Formulaire soumis');
+    
+    // Vérifier qu'il y a au moins une question
+    const questionCount = parseInt(document.getElementById('questionCount').value);
+    if (questionCount === 0) {
+        alert('Veuillez ajouter au moins une question');
+        e.preventDefault();
+        return false;
+    }
+    
+    // Vérifier que chaque question a au moins une bonne réponse
+    let hasError = false;
+    for (let i = 0; i < questionCount; i++) {
+        const questionBlock = document.getElementById('question_' + i);
+        if (!questionBlock) continue;
+        
+        const checkboxes = questionBlock.querySelectorAll('input[type="checkbox"]');
+        const hasCorrectAnswer = Array.from(checkboxes).some(cb => cb.checked);
+        
+        if (!hasCorrectAnswer) {
+            alert(`La question ${i + 1} doit avoir au moins une bonne réponse cochée`);
+            hasError = true;
+            break;
+        }
+    }
+    
+    if (hasError) {
+        e.preventDefault();
+        return false;
+    }
+    
+    showStatus('Sauvegarde en cours...', 'info');
+    console.log('Nombre de questions à sauvegarder:', questionCount);
+    
+    // Debug: afficher toutes les données du formulaire
+    const formData = new FormData(this);
+    for (let [key, value] of formData.entries()) {
+        console.log(key, ':', value);
+    }
+});
 </script>
 {% endblock %}
