@@ -11,16 +11,6 @@ from amc_manager import AMCManager
 from sample_questions import SAMPLE_QUESTIONS, SCORING_STRATEGIES
 from dashboard import register_dashboard_routes
 from pathlib import Path
-# AJOUTS POUR L'AUTHENTIFICATION
-from flask_login import LoginManager, login_required, current_user
-try:
-    from auth import auth_bp, get_user_by_id
-    from models import init_user_db
-    AUTH_ENABLED = True
-    print("✅ Système d'authentification chargé")
-except ImportError:
-    print("⚠️ Authentification non disponible")
-    AUTH_ENABLED = False
 
 
 import sys # Ajoutez cette ligne
@@ -29,25 +19,6 @@ import sys # Ajoutez cette ligne
 print(f"DEBUG: AMCManager loaded from module: {AMCManager.__module__}")
 print(f"DEBUG: AMCManager file path: {sys.modules['amc_manager'].__file__}")
 app = Flask(__name__)
-app.secret_key = 'votre-clef-secrete-changez-en-production-' + str(hash('amc-corrector'))
-
-# Initialiser Flask-Login si disponible
-if AUTH_ENABLED:
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
-    login_manager.login_message_category = 'info'
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return get_user_by_id(int(user_id))
-
-    # Enregistrer les routes d'authentification
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-    
-    # Initialiser la DB
-    init_user_db()
 app.secret_key = 'votre-cle-secrete-ici'  # Changez ceci en production
 
 # Configuration
@@ -101,13 +72,7 @@ def run_amc_command(command, project_path):
 
 @app.route('/')
 def index():
-    if AUTH_ENABLED:
-        if current_user.is_authenticated:
-            return redirect(url_for('dashboard'))
-        else:
-            return redirect(url_for('auth.login'))
-    else:
-        return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/download_csv/<project_id>')
 def download_csv_results(project_id):
