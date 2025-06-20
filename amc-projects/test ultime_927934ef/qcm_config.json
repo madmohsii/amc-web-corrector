@@ -1,8 +1,8 @@
 {
   "title": "QCM",
-  "subject": "",
+  "subject": "informatique",
   "duration": "60 minutes",
-  "num_pages": 2,
+  "num_pages": 1,
   "questions": [
     {
       "id": "q1",

@@ -87,10 +87,7 @@
                                         class="btn btn-outline-info" target="_blank">
                                         <i class="bi bi-eye"></i> Prévisualiser
                                     </a>
-                                    <a href="{{ url_for('download_qcm', project_id=project_id) }}"
-                                        class="btn btn-success">
-                                        <i class="bi bi-download"></i> Télécharger PDF
-                                    </a>
+                                    
                                     {% else %}
                                     <button class="btn btn-outline-secondary" disabled>
                                         <i class="bi bi-exclamation-triangle"></i> Configurer d'abord le QCM
@@ -129,11 +126,15 @@
                         <button class="btn btn-outline-secondary ms-2" onclick="regeneratePDF()">
                             <i class="bi bi-arrow-clockwise"></i> Régénérer PDF
                         </button>
+                        <a href="{{ url_for('download_qcm', project_id=project_id) }}"
+                                        class="btn btn-success">
+                                        <i class="bi bi-download"></i> Télécharger PDF
+                                    </a>
                     </div>
                     <div class="col-md-4">
                         <div class="alert alert-info mb-0 small">
                             <i class="bi bi-info-circle"></i>
-                            <strong>Info :</strong> Modifiez le nombre de pages puis cliquez sur "Appliquer" pour sauvegarder et régénérer le PDF.
+                            <strong>Info :</strong> Modifiez le nombre de pages puis cliquez sur "Appliquer" pour sauvegarder, régénérer le PDF puis télécharger le.
                         </div>
                     </div>
                 </div>
@@ -225,25 +226,7 @@
 
                                 <!-- Actions de correction -->
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <h6>Actions rapides :</h6>
-                                        <div class="d-grid gap-2">
-                                            {% if latex_exists and pdf_exists %}
-                                            <a href="{{ url_for('process_project', project_id=project_id) }}"
-                                                class="btn btn-primary">
-                                                <i class="bi bi-play-fill"></i> Démarrer Correction
-                                            </a>
-                                            {% else %}
-                                            <button class="btn btn-outline-primary" disabled>
-                                                <i class="bi bi-exclamation-triangle"></i> Projet non prêt
-                                            </button>
-                                            {% endif %}
-
-                                            <button class="btn btn-outline-info" onclick="quickScanCheck()">
-                                                <i class="bi bi-search"></i> Vérifier qualité scans
-                                            </button>
-                                        </div>
-                                    </div>
+                                    
 
                                     <div class="col-md-6">
                                         <h6>Correction express :</h6>
@@ -296,9 +279,7 @@
                                     <i class="bi bi-eye"></i> Voir les résultats
                                 </a>
 
-                                <button class="btn btn-outline-info" onclick="showProcessLog()">
-                                    <i class="bi bi-journal-text"></i> Journal de traitement
-                                </button>
+                               
                             </div>
                         </div>
                     </div>
@@ -463,26 +444,39 @@
 function regeneratePDF() {
     const button = event.target;
     const originalText = button.innerHTML;
-
-    button.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Génération...';
+    
+    // Afficher un indicateur de chargement
+    button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Régénération...';
     button.disabled = true;
-
+    
     fetch(`/generate_pdf/{{ project_id }}`)
-        .then(response => {
-            if (response.ok) {
-                showToast('success', 'PDF régénéré avec succès');
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                showToast('danger', 'Erreur lors de la régénération du PDF');
-            }
-        })
-        .catch(error => {
-            showToast('danger', 'Erreur: ' + error);
-        })
-        .finally(() => {
-            button.innerHTML = originalText;
-            button.disabled = false;
-        });
+    .then(response => {
+        if (response.ok) {
+            // Régénération réussie, maintenant télécharger automatiquement
+            showAlert('success', 'PDF régénéré avec succès ! Téléchargement automatique...');
+            
+            // Téléchargement automatique après 1 seconde
+            setTimeout(() => {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = "{{ url_for('download_qcm', project_id=project_id) }}";
+                downloadLink.download = 'qcm_{{ project_id }}.pdf';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }, 1000);
+            
+        } else {
+            showAlert('danger', 'Erreur lors de la régénération du PDF');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'Erreur de communication: ' + error);
+    })
+    .finally(() => {
+        // Restaurer le bouton
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
 }
         function triggerRegeneratePDF() {
             const button = event.target;
