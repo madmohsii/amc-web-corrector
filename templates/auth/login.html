@@ -49,11 +49,15 @@
                         </form>
                     </div>
                     <div class="card-footer text-center">
-                        <small class="text-muted">
-                            Pas encore de compte ? 
-                            <a href="{{ url_for('auth.register') }}" class="text-decoration-none">S'inscrire</a>
-                        </small>
-                    </div>
+    <small class="text-muted">
+        Pas encore de compte ? 
+        <a href="{{ url_for('auth.register') }}" class="text-decoration-none">S'inscrire</a>
+        <br>
+        <a href="{{ url_for('auth.forgot_password') }}" class="text-decoration-none">
+            <i class="bi bi-key"></i> Mot de passe oublié ?
+        </a>
+    </small>
+</div>
                 </div>
             </div>
         </div>

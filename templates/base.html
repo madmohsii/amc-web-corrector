@@ -333,8 +333,13 @@
                     </li>
                 {% else %}
                     <li class="login-links">
-                        <a href="{{ url_for('auth.login') }}">🔑 Connexion</a>
-                        <a href="{{ url_for('auth.register') }}">📝 Inscription</a>
+                        {% if AUTH_ENABLED %}
+                            <a href="{{ url_for('auth.login') }}">🔑 Connexion</a>
+                            <a href="{{ url_for('auth.register') }}">📝 Inscription</a>
+                        {% else %}
+                            <a href="/projects">📁 Projets</a>
+                            <a href="/create_project">➕ Nouveau Projet</a>
+                        {% endif %}
                     </li>
                 {% endif %}
             </ul>

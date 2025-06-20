@@ -11,6 +11,15 @@ from amc_manager import AMCManager
 from sample_questions import SAMPLE_QUESTIONS, SCORING_STRATEGIES
 from dashboard import register_dashboard_routes
 from pathlib import Path
+import sqlite3
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+from flask import current_app
+from werkzeug.security import generate_password_hash
+from flask_login import LoginManager, login_required, current_user
+
+USER_DB = 'amc_users.db'
 # AJOUTS POUR L'AUTHENTIFICATION
 from flask_login import LoginManager, login_required, current_user
 try:
@@ -30,7 +39,39 @@ print(f"DEBUG: AMCManager loaded from module: {AMCManager.__module__}")
 print(f"DEBUG: AMCManager file path: {sys.modules['amc_manager'].__file__}")
 app = Flask(__name__)
 app.secret_key = 'votre-clef-secrete-changez-en-production-' + str(hash('amc-corrector'))
+# Configuration email (ajoutez après app.secret_key)
+from dotenv import load_dotenv
+import os
 
+# Charger les variables d'environnement
+load_dotenv()
+
+# Puis modifiez votre configuration email (lignes 29-35) :
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+
+# Charger depuis les variables d'environnement
+app.config['MAIL_USERNAME'] = os.environ.get('GMAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('GMAIL_PASSWORD') 
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('GMAIL_USERNAME')
+
+# Vérification de la configuration
+if app.config['MAIL_USERNAME'] and app.config['MAIL_PASSWORD']:
+    print(f"📧 Configuration email chargée pour : {app.config['MAIL_USERNAME']}")
+else:
+    print("⚠️ Configuration email incomplète - vérifiez votre fichier .env")
+
+# Initialiser Flask-Mail
+try:
+    from flask_mail import Mail
+    mail = Mail(app)
+    EMAIL_ENABLED = True
+    print("✅ Service email activé")
+except ImportError:
+    EMAIL_ENABLED = False
+    print("⚠️ Service email non disponible")
 # Initialiser Flask-Login si disponible
 if AUTH_ENABLED:
     login_manager = LoginManager()
@@ -48,7 +89,10 @@ if AUTH_ENABLED:
     
     # Initialiser la DB
     init_user_db()
-app.secret_key = 'votre-cle-secrete-ici'  # Changez ceci en production
+
+
+
+
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -62,6 +106,199 @@ for folder in [UPLOAD_FOLDER, AMC_PROJECTS_FOLDER, RESULTS_FOLDER]:
 
 # Enregistrer les routes du dashboard
 register_dashboard_routes(app, AMC_PROJECTS_FOLDER)
+
+def init_reset_tokens_table():
+    """Créer la table des tokens de réinitialisation"""
+    conn = sqlite3.connect(USER_DB)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token VARCHAR(64) NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT FALSE,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # Nettoyage automatique des tokens expirés
+    cursor.execute('''
+        DELETE FROM password_reset_tokens 
+        WHERE expires_at < datetime('now') OR used = TRUE
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+def generate_reset_token(email):
+    """Générer un token de réinitialisation pour un email"""
+    conn = sqlite3.connect(USER_DB)
+    cursor = conn.cursor()
+    
+    # Vérifier que l'utilisateur existe
+    cursor.execute('SELECT id, username FROM users WHERE email = ?', (email,))
+    user = cursor.fetchone()
+    
+    if not user:
+        conn.close()
+        return None, "Aucun compte trouvé avec cette adresse email"
+    
+    user_id, username = user
+    
+    # Invalider les anciens tokens
+    cursor.execute('''
+        UPDATE password_reset_tokens 
+        SET used = TRUE 
+        WHERE user_id = ? AND used = FALSE
+    ''', (user_id,))
+    
+    # Générer un nouveau token
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now() + timedelta(hours=1)  # Expire dans 1 heure
+    
+    cursor.execute('''
+        INSERT INTO password_reset_tokens (user_id, token, expires_at)
+        VALUES (?, ?, ?)
+    ''', (user_id, token, expires_at))
+    
+    conn.commit()
+    conn.close()
+    
+    return token, f"Token généré pour {username}"
+
+def verify_reset_token(token):
+    """Vérifier la validité d'un token de réinitialisation"""
+    conn = sqlite3.connect(USER_DB)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT rt.user_id, rt.expires_at, u.username, u.email
+        FROM password_reset_tokens rt
+        JOIN users u ON rt.user_id = u.id
+        WHERE rt.token = ? AND rt.used = FALSE
+    ''', (token,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return None, "Token invalide ou déjà utilisé"
+    
+    user_id, expires_at, username, email = result
+    expires_at = datetime.fromisoformat(expires_at)
+    
+    if datetime.now() > expires_at:
+        return None, "Token expiré"
+    
+    return {
+        'user_id': user_id,
+        'username': username,
+        'email': email
+    }, "Token valide"
+
+def reset_password(token, new_password):
+    """Réinitialiser le mot de passe avec un token"""
+    user_data, message = verify_reset_token(token)
+    
+    if not user_data:
+        return False, message
+    
+    conn = sqlite3.connect(USER_DB)
+    cursor = conn.cursor()
+    
+    # Mettre à jour le mot de passe
+    password_hash = generate_password_hash(new_password)
+    cursor.execute('''
+        UPDATE users 
+        SET password_hash = ? 
+        WHERE id = ?
+    ''', (password_hash, user_data['user_id']))
+    
+    # Marquer le token comme utilisé
+    cursor.execute('''
+        UPDATE password_reset_tokens 
+        SET used = TRUE 
+        WHERE token = ?
+    ''', (token,))
+    
+    conn.commit()
+    conn.close()
+    
+    return True, f"Mot de passe réinitialisé pour {user_data['username']}"
+
+def send_reset_email(email, token):
+    """Envoyer l'email de réinitialisation"""
+    try:
+        from flask_mail import Message
+        from flask import url_for
+        
+        # Construire l'URL de réinitialisation
+        reset_url = url_for('auth.reset_password', token=token, _external=True)
+        
+        # Créer le message
+        msg = Message(
+            subject="Réinitialisation de votre mot de passe - AMC Corrector",
+            recipients=[email],
+            html=f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #667eea;">🔐 Réinitialisation de mot de passe</h2>
+                
+                <p>Vous avez demandé une réinitialisation de votre mot de passe pour AMC Web Corrector.</p>
+                
+                <p>Cliquez sur le lien ci-dessous pour créer un nouveau mot de passe :</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_url}" 
+                       style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                              color: white; 
+                              text-decoration: none; 
+                              padding: 15px 30px; 
+                              border-radius: 5px; 
+                              display: inline-block;">
+                        Réinitialiser mon mot de passe
+                    </a>
+                </div>
+                
+                <p style="color: #666; font-size: 0.9em;">
+                    <strong>⏰ Ce lien expire dans 1 heure.</strong>
+                </p>
+                
+                <p style="color: #666; font-size: 0.9em;">
+                    Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+                </p>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                
+                <p style="color: #999; font-size: 0.8em;">
+                    AMC Web Corrector - Correction automatique de QCM
+                </p>
+            </div>
+            """,
+            body=f"""
+            Réinitialisation de mot de passe - AMC Corrector
+            
+            Vous avez demandé une réinitialisation de votre mot de passe.
+            
+            Copiez et collez ce lien dans votre navigateur :
+            {reset_url}
+            
+            Ce lien expire dans 1 heure.
+            
+            Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+            """
+        )
+        
+        # Envoyer l'email
+        from app import mail  # Import depuis votre app principal
+        mail.send(msg)
+        return True, "Email envoyé avec succès"
+        
+    except Exception as e:
+        return False, f"Erreur lors de l'envoi : {str(e)}"
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -385,6 +622,7 @@ def generate_pdf(project_id):
         return redirect(url_for('project_detail', project_id=project_id))
 
 @app.route('/create_project', methods=['GET', 'POST'])
+@login_required  # AJOUT : Seuls les utilisateurs connectés peuvent créer des projets
 def create_project():
     if request.method == 'POST':
         project_name = request.form.get('project_name')
@@ -402,12 +640,14 @@ def create_project():
             # Créer la structure AMC avec AMCManager
             amc = AMCManager(project_path)
             
-            # Sauvegarder les métadonnées du projet
+            # MODIFICATION : Ajouter l'ID de l'utilisateur dans les métadonnées
             project_info = {
                 'name': project_name,
                 'id': project_id,
                 'created': datetime.now().isoformat(),
-                'path': project_path
+                'path': project_path,
+                'user_id': current_user.id,  # NOUVEAU : Lier le projet à l'utilisateur
+                'username': current_user.username  # NOUVEAU : Pour affichage
             }
             
             with open(os.path.join(project_path, 'project_info.json'), 'w') as f:
@@ -422,30 +662,38 @@ def create_project():
     return render_template('create_project.html')
 
 @app.route('/projects')
+@login_required  # AJOUT : Seuls les utilisateurs connectés peuvent voir les projets
 def list_projects():
     projects = []
     if os.path.exists(AMC_PROJECTS_FOLDER):
         for project_folder in os.listdir(AMC_PROJECTS_FOLDER):
             project_path = os.path.join(AMC_PROJECTS_FOLDER, project_folder)
             info_file = os.path.join(project_path, 'project_info.json')
-            
             if os.path.exists(info_file):
                 try:
                     with open(info_file, 'r') as f:
                         project_info = json.load(f)
-                        project_info['folder'] = project_folder
                         
-                        # Vérifier si un PDF existe
-                        pdf_exists = False
-                        for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
-                            if os.path.exists(os.path.join(project_path, pdf_name)):
-                                pdf_exists = True
-                                break
-                        project_info['pdf_ready'] = pdf_exists
+                        # SÉCURITÉ : Ne charger que les projets de l'utilisateur connecté
+                        print(f"DEBUG: Projet {project_info.get('name')} - user_id: {project_info.get('user_id')} (type: {type(project_info.get('user_id'))})")
+                        print(f"DEBUG: Utilisateur connecté - id: {current_user.id} (type: {type(current_user.id)})")
+                        if project_info.get('user_id') == current_user.id:
+                            project_info['folder'] = project_folder
+                            # Vérifier si un PDF existe
+                            pdf_exists = False
+                            for pdf_name in ['amc-compiled.pdf', 'questionnaire_output.pdf', 'questionnaire.pdf']:
+                                if os.path.exists(os.path.join(project_path, pdf_name)):
+                                    pdf_exists = True
+                                    break
+                            project_info['pdf_ready'] = pdf_exists
+                            projects.append(project_info)
+                        # SINON : Le projet appartient à un autre utilisateur - on l'ignore
                         
-                        projects.append(project_info)
-                except:
-                    pass
+                except json.JSONDecodeError:
+                    continue
+                except Exception as e:
+                    print(f"Erreur lors du chargement du projet {project_folder}: {e}")
+                    continue
     
     return render_template('projects.html', projects=projects)
 
@@ -1428,6 +1676,52 @@ def project_detail(project_id):
                            latex_exists=latex_exists,
                            current_pages=current_pages)
 
+# Ajoutez cette route de test dans votre app.py pour vérifier l'envoi
+
+# Ajoutez cette route à la fin de votre app.py (avant if __name__ == '__main__':)
+
+@app.route('/test-email')
+def test_email():
+    """Route de test pour vérifier l'envoi d'emails"""
+    try:
+        if not (app.config.get('MAIL_USERNAME') and app.config.get('MAIL_PASSWORD')):
+            return jsonify({
+                'success': False,
+                'error': 'Configuration email manquante. Vérifiez votre fichier .env'
+            }), 500
+        
+        from flask_mail import Message
+        
+        msg = Message(
+            subject="✅ Test AMC Corrector - Email configuré !",
+            recipients=[app.config['MAIL_USERNAME']],
+            html="""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #667eea;">✅ Configuration email réussie !</h2>
+                <p>Votre système AMC Corrector peut maintenant envoyer des emails.</p>
+                <p>Les utilisateurs pourront réinitialiser leurs mots de passe.</p>
+                <hr>
+                <p style="color: #666; font-size: 0.9em;">
+                    Test envoyé depuis AMC Web Corrector
+                </p>
+            </div>
+            """,
+            body="Configuration email réussie ! AMC Corrector peut maintenant envoyer des emails."
+        )
+        
+        mail.send(msg)
+        
+        return jsonify({
+            'success': True, 
+            'message': f'✅ Email de test envoyé avec succès à {app.config["MAIL_USERNAME"]}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False, 
+            'error': f'❌ Erreur envoi email: {str(e)}'
+        }), 500
+
 @app.route('/configure/<project_id>', methods=['GET', 'POST'])
 def configure_project(project_id):
     project_path = os.path.join(AMC_PROJECTS_FOLDER, project_id)
@@ -1687,10 +1981,20 @@ def view_results(project_id):
         flash(f'Erreur lors de l\'affichage: {str(e)}', 'error')
         return redirect(url_for('project_detail', project_id=project_id))  # Correction: project_detail
 
+@app.context_processor
+def inject_auth_status():
+    """Injecter AUTH_ENABLED dans tous les templates"""
+    return dict(AUTH_ENABLED=AUTH_ENABLED)
 
 @app.route('/help')
 def help_page():
     return render_template('index.html')
 
+# Initialiser les tables AVANT de démarrer l'app
 if __name__ == '__main__':
+    # Initialiser les tables de réinitialisation de mot de passe
+    init_reset_tokens_table()
+    print("✅ Table password_reset_tokens créée")
+    
+    # Démarrer l'application
     app.run(debug=True)

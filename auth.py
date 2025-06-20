@@ -82,6 +82,7 @@ def register():
             conn.commit()
             user_id = cursor.lastrowid
             
+            # CORRECTION DU BUG ICI : user_id au lieu de user_data[0]
             user = User(user_id, username, email, 'teacher')
             login_user(user)
             
@@ -102,3 +103,61 @@ def logout():
     logout_user()
     flash(f'Déconnexion réussie. À bientôt {username} !', 'info')
     return redirect(url_for('auth.login'))
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        
+        if not email:
+            flash('Veuillez saisir votre adresse email', 'danger')
+            return render_template('auth/forgot_password.html')
+        
+        from app import generate_reset_token, send_reset_email
+        
+        token, message = generate_reset_token(email)
+        
+        if token:
+            success, email_message = send_reset_email(email, token)
+            
+            if success:
+                flash(f'Un email de réinitialisation a été envoyé à {email}', 'success')
+                return redirect(url_for('auth.login'))
+            else:
+                reset_url = url_for('auth.reset_password', token=token, _external=True)
+                flash(f'Problème d\'envoi email. Lien direct : {reset_url}', 'info')
+        else:
+            flash(message, 'danger')
+    
+    return render_template('auth/forgot_password.html')
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    from app import verify_reset_token, reset_password as reset_pwd_func
+    
+    user_data, message = verify_reset_token(token)
+    
+    if not user_data:
+        flash(message, 'danger')
+        return redirect(url_for('auth.forgot_password'))
+    
+    if request.method == 'POST':
+        new_password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if len(new_password) < 6:
+            flash('Le mot de passe doit contenir au moins 6 caractères', 'danger')
+            return render_template('auth/reset_password.html', token=token, user=user_data)
+        
+        if new_password != confirm_password:
+            flash('Les mots de passe ne correspondent pas', 'danger')
+            return render_template('auth/reset_password.html', token=token, user=user_data)
+        
+        success, reset_message = reset_pwd_func(token, new_password)
+        
+        if success:
+            flash('Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter.', 'success')
+            return redirect(url_for('auth.login'))
+        else:
+            flash(reset_message, 'danger')
+    
+    return render_template('auth/reset_password.html', token=token, user=user_data)

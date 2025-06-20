@@ -28,3 +28,4 @@ env/
 # Fichiers de configuration locaux
 config.local.py
 .env
+.env
